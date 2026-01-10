@@ -1638,8 +1638,21 @@ return CustomCourseData`;
         let playerRunning = false;
         let playerPosition = 0;
         let playerSpeed = 0.15;
+        let playerBaseSpeed = 0.15;
         let followCamera = false;
         let runAnimationTime = 0;
+
+        // Collision state
+        let playerKnockback = 0;
+        let playerStunned = false;
+        let playerStunTime = 0;
+        let playerJumping = false;
+        let playerJumpVelocity = 0;
+        let playerYPosition = 0.1;
+        let playerSlowed = false;
+        let playerFlashing = false;
+        let playerFlashTime = 0;
+        let collisionCooldown = {};
 
         // 3D Colors
         const COLORS_3D = {
@@ -1683,8 +1696,20 @@ return CustomCourseData`;
             playerGroup = null;
             playerRunning = false;
             playerPosition = 0;
+            playerSpeed = playerBaseSpeed;
             followCamera = false;
             runAnimationTime = 0;
+            // Reset collision state
+            playerKnockback = 0;
+            playerStunned = false;
+            playerStunTime = 0;
+            playerJumping = false;
+            playerJumpVelocity = 0;
+            playerYPosition = 0.1;
+            playerSlowed = false;
+            playerFlashing = false;
+            playerFlashTime = 0;
+            collisionCooldown = {};
         }
 
         function init3DScene() {
@@ -2175,22 +2200,262 @@ return CustomCourseData`;
             gimmickMeshes.push(playerGroup);
         }
 
+        function checkCollisions() {
+            if (!playerGroup || !playerRunning) return;
+
+            const playerZ = playerPosition;
+            const playerRadius = 0.2;
+
+            courseGimmicks.forEach((gimmick, index) => {
+                const gimmickZ = (gimmick.z || gimmick.triggerZ || gimmick.zStart || 0) * SCALE_3D;
+                const gimmickLength = (gimmick.length || 30) * SCALE_3D;
+                const gimmickEndZ = gimmick.zEnd ? gimmick.zEnd * SCALE_3D : gimmickZ + gimmickLength;
+
+                // Collision cooldown check
+                const cooldownKey = `${gimmick.type}_${index}`;
+                if (collisionCooldown[cooldownKey] && Date.now() < collisionCooldown[cooldownKey]) {
+                    return;
+                }
+
+                let collision = false;
+
+                switch (gimmick.type) {
+                    case 'RotatingBar': {
+                        const barZ = gimmickZ;
+                        const barHeight = (gimmick.height || 3) * SCALE_3D;
+                        if (Math.abs(playerZ - barZ) < 0.3 && playerYPosition < barHeight + 0.3) {
+                            collision = true;
+                            // Knockback
+                            playerKnockback = -0.8;
+                            playerStunned = true;
+                            playerStunTime = Date.now() + 500;
+                            showCollisionEffect('hit');
+                            collisionCooldown[cooldownKey] = Date.now() + 1000;
+                        }
+                        break;
+                    }
+
+                    case 'JumpPad': {
+                        if (Math.abs(playerZ - gimmickZ) < 0.4 && !playerJumping) {
+                            collision = true;
+                            playerJumping = true;
+                            playerJumpVelocity = 0.15;
+                            showCollisionEffect('jump');
+                            collisionCooldown[cooldownKey] = Date.now() + 500;
+                        }
+                        break;
+                    }
+
+                    case 'SlimeZone': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            if (!playerSlowed) {
+                                playerSlowed = true;
+                                playerSpeed = playerBaseSpeed * 0.4;
+                                showCollisionEffect('slow');
+                            }
+                        } else if (playerSlowed && gimmick.type === 'SlimeZone') {
+                            // Check if we're out of ALL slime zones
+                            const inAnySlime = courseGimmicks.some((g, i) => {
+                                if (g.type !== 'SlimeZone') return false;
+                                const sz = (g.z || 0) * SCALE_3D;
+                                const sl = (g.length || 80) * SCALE_3D;
+                                return playerZ >= sz && playerZ <= sz + sl;
+                            });
+                            if (!inAnySlime) {
+                                playerSlowed = false;
+                                playerSpeed = playerBaseSpeed;
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'ElectricFloor': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            if (Math.sin(Date.now() * 0.005) > 0.7) { // Periodic shock
+                                if (!collisionCooldown[cooldownKey] || Date.now() > collisionCooldown[cooldownKey]) {
+                                    playerStunned = true;
+                                    playerStunTime = Date.now() + 300;
+                                    playerFlashing = true;
+                                    playerFlashTime = Date.now() + 300;
+                                    showCollisionEffect('shock');
+                                    collisionCooldown[cooldownKey] = Date.now() + 800;
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'ConveyorBelt': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            const pushDir = (gimmick.direction || -1);
+                            playerPosition += pushDir * 0.05;
+                        }
+                        break;
+                    }
+
+                    case 'PunchingCorridor': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            // Random punch
+                            if (Math.random() < 0.02) {
+                                playerKnockback = (Math.random() > 0.5 ? 1 : -1) * 0.3;
+                                playerStunned = true;
+                                playerStunTime = Date.now() + 300;
+                                showCollisionEffect('punch');
+                                collisionCooldown[cooldownKey] = Date.now() + 500;
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'RollingBoulder': {
+                        const boulderRange = gimmickEndZ - gimmickZ;
+                        const boulderCurrentZ = gimmickZ + (Math.sin(Date.now() * 0.001) * 0.5 + 0.5) * boulderRange;
+                        if (Math.abs(playerZ - boulderCurrentZ) < 0.5) {
+                            playerKnockback = -1.5;
+                            playerStunned = true;
+                            playerStunTime = Date.now() + 800;
+                            showCollisionEffect('crush');
+                            collisionCooldown[cooldownKey] = Date.now() + 1500;
+                        }
+                        break;
+                    }
+
+                    case 'DisappearingBridge': {
+                        // Visual effect only - platforms disappear
+                        break;
+                    }
+
+                    case 'QuizGate':
+                    case 'Elevator': {
+                        const gateZ = (gimmick.gateZ || gimmick.elevZ || gimmickZ + 30) * SCALE_3D;
+                        if (Math.abs(playerZ - gateZ) < 0.3) {
+                            // Random pass/fail (50% chance in preview)
+                            if (Math.random() < 0.3) {
+                                playerKnockback = -0.5;
+                                showCollisionEffect('wrong');
+                                collisionCooldown[cooldownKey] = Date.now() + 1000;
+                            } else {
+                                showCollisionEffect('correct');
+                                collisionCooldown[cooldownKey] = Date.now() + 1000;
+                            }
+                        }
+                        break;
+                    }
+                }
+            });
+        }
+
+        function showCollisionEffect(type) {
+            // Create floating text effect
+            const effectColors = {
+                hit: '#ff4444',
+                jump: '#44ff44',
+                slow: '#7FFF00',
+                shock: '#FFD700',
+                punch: '#ff0000',
+                crush: '#8B4513',
+                wrong: '#ff0000',
+                correct: '#00ff00'
+            };
+
+            const effectTexts = {
+                hit: '💥 HIT!',
+                jump: '🔺 JUMP!',
+                slow: '🐌 SLOW',
+                shock: '⚡ ZAP!',
+                punch: '🥊 PUNCH!',
+                crush: '🪨 CRUSH!',
+                wrong: '❌ WRONG!',
+                correct: '✅ PASS!'
+            };
+
+            // Flash player
+            if (type === 'hit' || type === 'shock' || type === 'punch' || type === 'crush' || type === 'wrong') {
+                playerFlashing = true;
+                playerFlashTime = Date.now() + 300;
+            }
+
+            // Show effect in UI (simple console for now, could add 3D text)
+            console.log(`[Collision] ${effectTexts[type]}`);
+        }
+
         function animatePlayer() {
             if (!playerGroup) return;
 
             const courseLength = parseInt(document.getElementById('courseLength').value) || 2000;
             const trackLength = courseLength * SCALE_3D;
 
-            if (playerRunning) {
+            // Handle stun
+            if (playerStunned && Date.now() > playerStunTime) {
+                playerStunned = false;
+            }
+
+            // Handle flashing
+            if (playerFlashing) {
+                if (Date.now() > playerFlashTime) {
+                    playerFlashing = false;
+                    // Reset color
+                    playerGroup.children.forEach(child => {
+                        if (child.material && child.name === 'body') {
+                            child.material.color.setHex(0x3498db);
+                        }
+                    });
+                } else {
+                    // Flash red/white
+                    const flashOn = Math.floor(Date.now() / 50) % 2 === 0;
+                    playerGroup.children.forEach(child => {
+                        if (child.material && child.name === 'body') {
+                            child.material.color.setHex(flashOn ? 0xff0000 : 0xffffff);
+                        }
+                    });
+                }
+            }
+
+            // Handle jump physics
+            if (playerJumping) {
+                playerYPosition += playerJumpVelocity;
+                playerJumpVelocity -= 0.008; // Gravity
+
+                if (playerYPosition <= 0.1) {
+                    playerYPosition = 0.1;
+                    playerJumping = false;
+                    playerJumpVelocity = 0;
+                }
+            }
+
+            // Handle knockback
+            if (playerKnockback !== 0) {
+                playerPosition += playerKnockback;
+                playerKnockback *= 0.85; // Decay
+                if (Math.abs(playerKnockback) < 0.01) {
+                    playerKnockback = 0;
+                }
+            }
+
+            if (playerRunning && !playerStunned) {
                 runAnimationTime += 0.15;
 
                 // Move forward
                 playerPosition += playerSpeed;
                 if (playerPosition > trackLength) {
                     playerPosition = 0.5;
+                    // Reset states on loop
+                    playerSlowed = false;
+                    playerSpeed = playerBaseSpeed;
                 }
-                playerGroup.position.z = playerPosition;
+                if (playerPosition < 0) {
+                    playerPosition = 0.5;
+                }
 
+                // Check collisions
+                checkCollisions();
+            }
+
+            // Update player position
+            playerGroup.position.z = playerPosition;
+            playerGroup.position.y = playerYPosition;
+
+            if (playerRunning && !playerStunned) {
                 // Running animation
                 const runCycle = Math.sin(runAnimationTime * 2);
                 const runCycle2 = Math.cos(runAnimationTime * 2);
@@ -2222,36 +2487,25 @@ return CustomCourseData`;
                 });
 
                 // Update shoe positions with leg movement
-                const leftLeg = playerGroup.children.find(c => c.name === 'leftLeg');
-                const rightLeg = playerGroup.children.find(c => c.name === 'rightLeg');
                 const leftShoe = playerGroup.children.find(c => c.name === 'leftShoe');
                 const rightShoe = playerGroup.children.find(c => c.name === 'rightShoe');
+                const runCycleForShoe = Math.sin(runAnimationTime * 2);
 
-                if (leftShoe && leftLeg) {
-                    leftShoe.position.z = 0.02 + Math.sin(-runCycle * 0.6) * 0.15;
-                    leftShoe.position.y = 0.03 + Math.max(0, -Math.sin(-runCycle * 0.6)) * 0.1;
+                if (leftShoe) {
+                    leftShoe.position.z = 0.02 + Math.sin(-runCycleForShoe * 0.6) * 0.15;
+                    leftShoe.position.y = 0.03 + Math.max(0, -Math.sin(-runCycleForShoe * 0.6)) * 0.1;
                 }
-                if (rightShoe && rightLeg) {
-                    rightShoe.position.z = 0.02 + Math.sin(runCycle * 0.6) * 0.15;
-                    rightShoe.position.y = 0.03 + Math.max(0, -Math.sin(runCycle * 0.6)) * 0.1;
+                if (rightShoe) {
+                    rightShoe.position.z = 0.02 + Math.sin(runCycleForShoe * 0.6) * 0.15;
+                    rightShoe.position.y = 0.03 + Math.max(0, -Math.sin(runCycleForShoe * 0.6)) * 0.1;
                 }
-
-                // Camera follow
-                if (followCamera) {
-                    const offset = new THREE.Vector3(3, 2, -4);
-                    camera3D.position.set(
-                        playerGroup.position.x + offset.x,
-                        playerGroup.position.y + offset.y,
-                        playerGroup.position.z + offset.z
-                    );
-                    controls3D.target.set(
-                        playerGroup.position.x,
-                        playerGroup.position.y + 0.5,
-                        playerGroup.position.z + 2
-                    );
-                }
+            } else if (playerStunned) {
+                // Stunned animation - wobble
+                const wobble = Math.sin(Date.now() * 0.02) * 0.1;
+                playerGroup.rotation.z = wobble;
             } else {
                 // Idle animation (subtle breathing)
+                playerGroup.rotation.z = 0;
                 runAnimationTime += 0.02;
                 const breathe = Math.sin(runAnimationTime) * 0.01;
 
@@ -2287,6 +2541,21 @@ return CustomCourseData`;
                     rightShoe.position.y = 0.03;
                 }
             }
+
+            // Camera follow
+            if (followCamera) {
+                const offset = new THREE.Vector3(3, 2 + playerYPosition, -4);
+                camera3D.position.set(
+                    playerGroup.position.x + offset.x,
+                    playerGroup.position.y + offset.y,
+                    playerGroup.position.z + offset.z
+                );
+                controls3D.target.set(
+                    playerGroup.position.x,
+                    playerGroup.position.y + 0.5,
+                    playerGroup.position.z + 2
+                );
+            }
         }
 
         function togglePlayerRun() {
@@ -2317,12 +2586,35 @@ return CustomCourseData`;
 
         function resetPlayer() {
             if (playerGroup) {
+                // Reset position
                 playerPosition = 0.5;
+                playerYPosition = 0.1;
                 playerGroup.position.z = playerPosition;
+                playerGroup.position.y = playerYPosition;
+                playerGroup.rotation.z = 0;
+
+                // Reset running state
                 playerRunning = false;
+                playerSpeed = playerBaseSpeed;
                 const btn = document.getElementById('btnRun');
                 btn.textContent = '🏃 플레이어 달리기';
                 btn.classList.remove('active');
+
+                // Reset collision states
+                playerKnockback = 0;
+                playerStunned = false;
+                playerJumping = false;
+                playerJumpVelocity = 0;
+                playerSlowed = false;
+                playerFlashing = false;
+                collisionCooldown = {};
+
+                // Reset body color
+                playerGroup.children.forEach(child => {
+                    if (child.material && child.name === 'body') {
+                        child.material.color.setHex(0x3498db);
+                    }
+                });
             }
         }
     </script>
