@@ -481,6 +481,186 @@
             background: linear-gradient(180deg, #2d3436 0%, #48dbfb22 100%);
         }
 
+        /* Preview Modal */
+        .preview-container {
+            position: relative;
+            background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 60%, #228B22 60%, #228B22 100%);
+            border-radius: 8px;
+            overflow: hidden;
+            height: 500px;
+        }
+
+        .preview-canvas-wrapper {
+            width: 100%;
+            height: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .preview-canvas {
+            height: 100%;
+            min-width: 100%;
+            position: relative;
+        }
+
+        .preview-track {
+            position: absolute;
+            bottom: 80px;
+            height: 60px;
+            background: linear-gradient(180deg, #555 0%, #333 100%);
+            border-top: 4px solid #666;
+            border-bottom: 4px solid #222;
+        }
+
+        .preview-track-lines {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: repeating-linear-gradient(90deg, #fff 0px, #fff 30px, transparent 30px, transparent 60px);
+            transform: translateY(-50%);
+            opacity: 0.5;
+        }
+
+        .preview-start {
+            position: absolute;
+            bottom: 140px;
+            left: 30px;
+            background: linear-gradient(135deg, #38ef7d, #11998e);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-finish {
+            position: absolute;
+            bottom: 140px;
+            background: linear-gradient(135deg, #f5576c, #f093fb);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-gimmick {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .preview-gimmick:hover {
+            transform: scale(1.1);
+        }
+
+        .preview-gimmick-icon {
+            font-size: 2rem;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+        }
+
+        .preview-gimmick-label {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            margin-top: 4px;
+        }
+
+        .preview-zone {
+            position: absolute;
+            bottom: 140px;
+            opacity: 0.6;
+            border-radius: 4px;
+        }
+
+        .preview-zone.slime {
+            background: linear-gradient(180deg, #7FFF00 0%, #32CD32 100%);
+        }
+
+        .preview-zone.conveyor {
+            background: linear-gradient(180deg, #666 0%, #444 100%);
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);
+        }
+
+        .preview-zone.electric {
+            background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%);
+            animation: electric-pulse 0.5s infinite;
+        }
+
+        @keyframes electric-pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 0.9; }
+        }
+
+        .preview-zone.punching {
+            background: linear-gradient(180deg, #DC143C 0%, #8B0000 100%);
+        }
+
+        .preview-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .preview-control-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+        }
+
+        .preview-control-btn:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .preview-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            z-index: 10;
+        }
+
+        .preview-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+
+        .legend-icon {
+            font-size: 1.2rem;
+        }
+
         /* Stats Bar */
         .stats-bar {
             display: flex;
@@ -514,6 +694,7 @@
         <div class="header-buttons">
             <button class="btn btn-primary" onclick="newCourse()">📄 New</button>
             <button class="btn btn-primary" onclick="loadFromJson()">📂 Load</button>
+            <button class="btn btn-warning" onclick="showPreviewModal()">👁️ Preview</button>
             <button class="btn btn-success" onclick="showExportModal()">💾 Export</button>
         </div>
     </header>
@@ -682,6 +863,52 @@
             </div>
             <pre class="export-code" id="exportCode"></pre>
             <button class="btn btn-success copy-btn" onclick="copyExportCode()">📋 Copy to Clipboard</button>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal" style="max-width: 95%; width: 1200px;">
+            <div class="modal-header">
+                <h2>👁️ Course Preview</h2>
+                <button class="modal-close" onclick="closePreviewModal()">×</button>
+            </div>
+            <div class="preview-container" id="previewContainer">
+                <div class="preview-info">
+                    <span id="previewCourseName">My Course</span> |
+                    <span id="previewGimmickCount">0</span> gimmicks
+                </div>
+                <div class="preview-controls">
+                    <button class="preview-control-btn" onclick="zoomPreview(-1)" title="Zoom Out">−</button>
+                    <button class="preview-control-btn" onclick="zoomPreview(1)" title="Zoom In">+</button>
+                    <button class="preview-control-btn" onclick="resetPreviewZoom()" title="Reset">⟲</button>
+                </div>
+                <div class="preview-canvas-wrapper" id="previewWrapper">
+                    <div class="preview-canvas" id="previewCanvas">
+                        <!-- Track -->
+                        <div class="preview-track" id="previewTrack">
+                            <div class="preview-track-lines"></div>
+                        </div>
+                        <!-- Start/Finish markers -->
+                        <div class="preview-start">🏁 START</div>
+                        <div class="preview-finish" id="previewFinish">🎯 FINISH</div>
+                        <!-- Gimmicks will be rendered here -->
+                        <div id="previewGimmicks"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-legend">
+                <div class="legend-item"><span class="legend-icon">🔄</span> 회전 막대</div>
+                <div class="legend-item"><span class="legend-icon">🔺</span> 점프 패드</div>
+                <div class="legend-item"><span class="legend-icon">👻</span> 슬라임</div>
+                <div class="legend-item"><span class="legend-icon">🥊</span> 펀칭 복도</div>
+                <div class="legend-item"><span class="legend-icon">🚪</span> 퀴즈 게이트</div>
+                <div class="legend-item"><span class="legend-icon">🛗</span> 엘리베이터</div>
+                <div class="legend-item"><span class="legend-icon">⬅️</span> 컨베이어</div>
+                <div class="legend-item"><span class="legend-icon">⚡</span> 전기 바닥</div>
+                <div class="legend-item"><span class="legend-icon">🪨</span> 바위</div>
+                <div class="legend-item"><span class="legend-icon">⏰</span> 사라지는 다리</div>
+            </div>
         </div>
     </div>
 
@@ -1167,6 +1394,160 @@ return CustomCourseData`;
                 alert('코스를 불러왔습니다!');
             } catch (e) {
                 alert('JSON 파싱 오류: ' + e.message);
+            }
+        }
+
+        // ============================================
+        // PREVIEW FUNCTIONALITY
+        // ============================================
+        let previewScale = 0.5; // pixels per Z unit
+        const MIN_SCALE = 0.2;
+        const MAX_SCALE = 2;
+
+        function showPreviewModal() {
+            document.getElementById('previewModal').classList.add('active');
+            renderPreview();
+        }
+
+        function closePreviewModal() {
+            document.getElementById('previewModal').classList.remove('active');
+        }
+
+        function zoomPreview(direction) {
+            previewScale += direction * 0.1;
+            previewScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, previewScale));
+            renderPreview();
+        }
+
+        function resetPreviewZoom() {
+            previewScale = 0.5;
+            renderPreview();
+        }
+
+        function renderPreview() {
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 2000;
+            const canvasWidth = (courseLength + 200) * previewScale;
+
+            // Update info
+            document.getElementById('previewCourseName').textContent = document.getElementById('courseName').value;
+            document.getElementById('previewGimmickCount').textContent = courseGimmicks.length;
+
+            // Set canvas width
+            const canvas = document.getElementById('previewCanvas');
+            canvas.style.width = `${Math.max(canvasWidth, 1000)}px`;
+
+            // Set track width
+            const track = document.getElementById('previewTrack');
+            track.style.left = `${50 * previewScale}px`;
+            track.style.width = `${courseLength * previewScale}px`;
+
+            // Position finish marker
+            const finish = document.getElementById('previewFinish');
+            finish.style.left = `${(courseLength + 30) * previewScale}px`;
+
+            // Render gimmicks
+            const gimmicksContainer = document.getElementById('previewGimmicks');
+            gimmicksContainer.innerHTML = '';
+
+            courseGimmicks.forEach((gimmick, index) => {
+                const schema = gimmickSchemas[gimmick.type];
+                if (!schema) return;
+
+                const z = getGimmickZ(gimmick);
+                const xPos = (z + 50) * previewScale;
+
+                // Check if it's a zone-type gimmick (has length)
+                if (gimmick.length !== undefined || gimmick.zEnd !== undefined) {
+                    // Zone gimmicks (SlimeZone, ConveyorBelt, ElectricFloor, PunchingCorridor)
+                    const length = gimmick.length || (gimmick.zEnd - gimmick.zStart) || 60;
+                    const zone = document.createElement('div');
+                    zone.className = 'preview-zone';
+
+                    // Determine zone class
+                    if (gimmick.type === 'SlimeZone') zone.classList.add('slime');
+                    else if (gimmick.type === 'ConveyorBelt') zone.classList.add('conveyor');
+                    else if (gimmick.type === 'ElectricFloor') zone.classList.add('electric');
+                    else if (gimmick.type === 'PunchingCorridor') zone.classList.add('punching');
+                    else if (gimmick.type === 'RollingBoulder') {
+                        zone.style.background = 'linear-gradient(90deg, transparent, rgba(139,69,19,0.5), transparent)';
+                    }
+                    else if (gimmick.type === 'DisappearingBridge') {
+                        zone.style.background = 'rgba(100,100,100,0.5)';
+                        zone.style.borderTop = '3px dashed #fff';
+                    }
+
+                    zone.style.left = `${xPos}px`;
+                    zone.style.width = `${length * previewScale}px`;
+                    zone.style.height = '50px';
+                    zone.title = `${schema.displayName} (Z: ${z}, 길이: ${length})`;
+                    zone.onclick = () => { closePreviewModal(); selectGimmick(index); };
+
+                    // Add label
+                    const label = document.createElement('div');
+                    label.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;';
+                    label.textContent = schema.icon;
+                    zone.appendChild(label);
+
+                    gimmicksContainer.appendChild(zone);
+                } else {
+                    // Point gimmicks (RotatingBar, JumpPad, QuizGate, Elevator)
+                    const gimmickEl = document.createElement('div');
+                    gimmickEl.className = 'preview-gimmick';
+                    gimmickEl.style.left = `${xPos}px`;
+
+                    // Adjust vertical position based on type
+                    let bottomPos = 145;
+                    if (gimmick.type === 'RotatingBar') {
+                        bottomPos = 150 + (gimmick.height || 3) * 5;
+                    } else if (gimmick.type === 'JumpPad') {
+                        bottomPos = 140;
+                    } else if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator') {
+                        bottomPos = 170;
+                    }
+                    gimmickEl.style.bottom = `${bottomPos}px`;
+
+                    // Tooltip
+                    let tooltip = `${schema.displayName} (Z: ${z})`;
+                    if (gimmick.id) tooltip += ` #${gimmick.id}`;
+                    if (gimmick.options) tooltip += ` [${gimmick.options}선택지]`;
+                    gimmickEl.title = tooltip;
+
+                    gimmickEl.onclick = () => { closePreviewModal(); selectGimmick(index); };
+
+                    // Icon
+                    const icon = document.createElement('div');
+                    icon.className = 'preview-gimmick-icon';
+                    icon.textContent = schema.icon;
+                    gimmickEl.appendChild(icon);
+
+                    // Label for QuizGate/Elevator
+                    if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator') {
+                        const labelEl = document.createElement('div');
+                        labelEl.className = 'preview-gimmick-label';
+                        labelEl.textContent = `#${gimmick.id} (${gimmick.options}개)`;
+                        gimmickEl.appendChild(labelEl);
+                    }
+
+                    gimmicksContainer.appendChild(gimmickEl);
+                }
+            });
+
+            // Add Z markers
+            for (let z = 0; z <= courseLength; z += 200) {
+                const marker = document.createElement('div');
+                marker.style.cssText = `
+                    position: absolute;
+                    bottom: 60px;
+                    left: ${(z + 50) * previewScale}px;
+                    transform: translateX(-50%);
+                    font-size: 0.7rem;
+                    color: rgba(255,255,255,0.7);
+                    background: rgba(0,0,0,0.5);
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                `;
+                marker.textContent = `Z:${z}`;
+                gimmicksContainer.appendChild(marker);
             }
         }
     </script>
