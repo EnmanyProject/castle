@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Quiz Castle - 기믹 가이드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            border: 2px solid #ffd700;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        
+        .header p {
+            color: #aaa;
+            margin-top: 10px;
+            font-size: 1.2em;
+        }
+        
+        .track-map {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+        
+        .track-map h2 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+        
+        .track {
+            display: flex;
+            align-items: center;
+            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 1500px;
+            position: relative;
+            height: 80px;
+        }
+        
+        .track-marker {
+            position: absolute;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+        
+        .gimmick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .gimmick-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .gimmick-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .gimmick-header {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .gimmick-icon {
+            font-size: 3em;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+        }
+        
+        .gimmick-title h3 {
+            font-size: 1.4em;
+            margin-bottom: 5px;
+        }
+        
+        .gimmick-title .location {
+            color: #888;
+            font-size: 0.9em;
+        }
+        
+        .gimmick-visual {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .gimmick-body {
+            padding: 20px;
+        }
+        
+        .gimmick-desc {
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .gimmick-tips {
+            background: rgba(0, 255, 100, 0.1);
+            border-left: 3px solid #00ff64;
+            padding: 10px 15px;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .gimmick-tips h4 {
+            color: #00ff64;
+            margin-bottom: 5px;
+        }
+        
+        .gimmick-tips ul {
+            color: #aaa;
+            padding-left: 20px;
+        }
+        
+        .gimmick-tips li {
+            margin: 5px 0;
+        }
+        
+        .config-box {
+            background: rgba(100, 100, 255, 0.1);
+            border: 1px solid rgba(100, 100, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .config-box h4 {
+            color: #8888ff;
+            margin-bottom: 10px;
+        }
+        
+        .config-box code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-family: 'Consolas', monospace;
+            color: #ffcc00;
+        }
+        
+        /* 기믹별 색상 */
+        .rotating-bar .gimmick-header { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%); }
+        .rotating-bar .gimmick-icon { background: rgba(255, 0, 0, 0.2); }
+        
+        .jump-pad .gimmick-header { background: linear-gradient(135deg, #44ff44 0%, #00cc00 100%); }
+        .jump-pad .gimmick-icon { background: rgba(0, 255, 0, 0.2); }
+        
+        .slime .gimmick-header { background: linear-gradient(135deg, #88ff88 0%, #44aa44 100%); }
+        .slime .gimmick-icon { background: rgba(100, 255, 100, 0.2); }
+        
+        .punching-glove .gimmick-header { background: linear-gradient(135deg, #ff6666 0%, #cc3333 100%); }
+        .punching-glove .gimmick-icon { background: rgba(255, 100, 100, 0.2); }
+        
+        .quiz-gate .gimmick-header { background: linear-gradient(135deg, #aa44ff 0%, #7700cc 100%); }
+        .quiz-gate .gimmick-icon { background: rgba(170, 68, 255, 0.2); }
+        
+        .elevator .gimmick-header { background: linear-gradient(135deg, #44ffff 0%, #00aaaa 100%); }
+        .elevator .gimmick-icon { background: rgba(0, 255, 255, 0.2); }
+        
+        .disappearing-bridge .gimmick-header { background: linear-gradient(135deg, #ffaa44 0%, #cc7700 100%); }
+        .disappearing-bridge .gimmick-icon { background: rgba(255, 170, 68, 0.2); }
+        
+        .conveyor .gimmick-header { background: linear-gradient(135deg, #888888 0%, #555555 100%); }
+        .conveyor .gimmick-icon { background: rgba(150, 150, 150, 0.2); }
+        
+        .electric-floor .gimmick-header { background: linear-gradient(135deg, #ffff44 0%, #aaaa00 100%); }
+        .electric-floor .gimmick-icon { background: rgba(255, 255, 0, 0.2); }
+        
+        .boulder .gimmick-header { background: linear-gradient(135deg, #666666 0%, #333333 100%); }
+        .boulder .gimmick-icon { background: rgba(100, 100, 100, 0.2); }
+        
+        .sequence-puzzle .gimmick-header { background: linear-gradient(135deg, #ff44ff 0%, #aa00aa 100%); }
+        .sequence-puzzle .gimmick-icon { background: rgba(255, 0, 255, 0.2); }
+        
+        /* 애니메이션 */
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+        
+        @keyframes slide {
+            0% { transform: translateX(-30px); }
+            100% { transform: translateX(30px); }
+        }
+        
+        @keyframes punch {
+            0%, 70%, 100% { transform: translateX(0); }
+            80% { transform: translateX(40px); }
+        }
+        
+        @keyframes blink {
+            0%, 40%, 100% { background: #888; }
+            50%, 60% { background: #ffff00; }
+        }
+        
+        @keyframes roll {
+            from { transform: translateX(60px) rotate(0deg); }
+            to { transform: translateX(-60px) rotate(-360deg); }
+        }
+        
+        .rotating-bar .visual-element {
+            width: 100px;
+            height: 10px;
+            background: #ff4444;
+            border-radius: 5px;
+            animation: rotate 2s linear infinite;
+        }
+        
+        .jump-pad .visual-element {
+            width: 50px;
+            height: 50px;
+            background: #44ff44;
+            border-radius: 10px;
+            animation: bounce 1s ease-in-out infinite;
+        }
+        
+        .slime .visual-element {
+            width: 100px;
+            height: 30px;
+            background: linear-gradient(180deg, rgba(100, 255, 100, 0.8) 0%, rgba(50, 200, 50, 0.5) 100%);
+            border-radius: 5px;
+        }
+        
+        .punching-glove .visual-element {
+            width: 40px;
+            height: 40px;
+            background: #ff4444;
+            border-radius: 50%;
+            animation: punch 2s ease-in-out infinite;
+        }
+        
+        .quiz-gate .visual-element {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .quiz-gate .gate {
+            width: 40px;
+            height: 60px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .elevator .visual-element {
+            display: flex;
+            gap: 5px;
+            align-items: flex-end;
+        }
+        
+        .elevator .platform {
+            width: 40px;
+            height: 30px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .elevator .platform.up {
+            height: 60px;
+            animation: none;
+        }
+        
+        .disappearing-bridge .visual-element {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .disappearing-bridge .plat {
+            width: 40px;
+            height: 40px;
+            background: #ffaa44;
+            border-radius: 5px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .disappearing-bridge .plat:nth-child(2) { animation-delay: 0.5s; }
+        .disappearing-bridge .plat:nth-child(3) { animation-delay: 1s; }
+        
+        .conveyor .visual-element {
+            width: 120px;
+            height: 30px;
+            background: #555;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .conveyor .arrow {
+            position: absolute;
+            color: #ffff00;
+            font-size: 1.5em;
+            animation: slide 1s linear infinite reverse;
+        }
+        
+        .electric-floor .visual-element {
+            width: 100px;
+            height: 30px;
+            border-radius: 5px;
+            animation: blink 2s ease-in-out infinite;
+        }
+        
+        .boulder .visual-element {
+            width: 50px;
+            height: 50px;
+            background: #666;
+            border-radius: 50%;
+            animation: roll 2s linear infinite;
+        }
+        
+        .sequence-puzzle .visual-element {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+        }
+        
+        .sequence-puzzle .num {
+            width: 40px;
+            height: 40px;
+            background: #888;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        
+        .difficulty {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        
+        .difficulty.easy { background: #44ff44; color: #000; }
+        .difficulty.medium { background: #ffaa44; color: #000; }
+        .difficulty.hard { background: #ff4444; color: #fff; }
+        
+        .section-title {
+            font-size: 2em;
+            color: #ffd700;
+            margin: 40px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        /* 트랙 맵 마커 색상 */
+        .marker-rotating { background: #ff4444; }
+        .marker-jump { background: #44ff44; }
+        .marker-quiz { background: #aa44ff; }
+        .marker-elevator { background: #44ffff; }
+        .marker-bridge { background: #ffaa44; }
+        .marker-slime { background: #88ff88; }
+        .marker-conveyor { background: #888888; }
+        .marker-electric { background: #ffff44; color: #000; }
+        .marker-boulder { background: #666666; }
+        .marker-punch { background: #ff6666; }
+        .marker-sequence { background: #ff44ff; }
+        .marker-finish { background: #ffd700; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏰 QUIZ CASTLE</h1>
+        <p>기믹 가이드 & 코스 맵</p>
+    </div>
+    
+    <div class="track-map">
+        <h2>📍 코스 맵 (2000m)</h2>
+        <div class="track">
+            <!-- 구간 1: 워밍업 -->
+            <div class="track-marker marker-rotating" style="left: 3%;">🔄 60m</div>
+            <div class="track-marker marker-rotating" style="left: 5%;">🔄 100m</div>
+            <div class="track-marker marker-quiz" style="left: 9%;">❓ 180m</div>
+            <div class="track-marker marker-rotating" style="left: 12.5%;">🔄 250m</div>
+            <div class="track-marker marker-quiz" style="left: 17.5%;">❓ 350m</div>
+            
+            <!-- 구간 2: 점프 & 엘리베이터 -->
+            <div class="track-marker marker-jump" style="left: 23%;">🟢 430-560m</div>
+            <div class="track-marker marker-elevator" style="left: 33.5%;">🛗 670m</div>
+            <div class="track-marker marker-bridge" style="left: 36%;">🌉 720m</div>
+            
+            <!-- 구간 3: 슬라임 & 회전막대 -->
+            <div class="track-marker marker-slime" style="left: 43%;">🟩 830m</div>
+            <div class="track-marker marker-quiz" style="left: 49.5%;">❓ 990m</div>
+            <div class="track-marker marker-conveyor" style="left: 52%;">⬅️ 1040m</div>
+            <div class="track-marker marker-electric" style="left: 56%;">⚡ 1120m</div>
+            
+            <!-- 구간 4: 위험지대 -->
+            <div class="track-marker marker-boulder" style="left: 61%;">🪨 1220m</div>
+            <div class="track-marker marker-punch" style="left: 65%;">🥊 1280m</div>
+            <div class="track-marker marker-quiz" style="left: 72.5%;">❓ 1450m</div>
+            <div class="track-marker marker-elevator" style="left: 77.5%;">🛗 1550m</div>
+            
+            <!-- 구간 5: 슬라임 & 퀴즈 -->
+            <div class="track-marker marker-slime" style="left: 85%;">🟩 1700m</div>
+            <div class="track-marker marker-quiz" style="left: 91.5%;">❓ 1830m</div>
+            
+            <!-- 구간 6: 파이널 -->
+            <div class="track-marker marker-conveyor" style="left: 93%;">⬅️ 1860m</div>
+            <div class="track-marker marker-electric" style="left: 95.5%;">⚡ 1910m</div>
+            <div class="track-marker marker-finish" style="left: 99%;">🏆 2000m</div>
+        </div>
+    </div>
+    
+    <h2 class="section-title">🎮 기믹 상세 가이드</h2>
+    
+    <div class="gimmick-grid">
+        <!-- 1. 회전 막대 -->
+        <div class="gimmick-card rotating-bar">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🔄</div>
+                <div class="gimmick-title">
+                    <h3>회전 막대 <span class="difficulty easy">쉬움</span></h3>
+                    <div class="location">📍 60m, 100m, 250m, 860m, 890m, 1730m, 1760m, 1950m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element"></div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    중앙에서 계속 회전하는 막대입니다.<br>
+                    맞으면 뒤로 튕겨납니다!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>막대가 지나간 직후 통과</li>
+                        <li>점프로 넘기 (높이에 따라)</li>
+                        <li>타이밍 맞춰서 달리기</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableRotatingBars = true/false</code></p>
+                    <p>속도: <code>ObstacleSpeed = 1.0</code> (높을수록 빠름)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 2. 점프 패드 -->
+        <div class="gimmick-card jump-pad">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🟢</div>
+                <div class="gimmick-title">
+                    <h3>점프 패드 <span class="difficulty easy">쉬움</span></h3>
+                    <div class="location">📍 430m, 470m, 510m, 560m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element"></div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    연두색 패드를 밟으면 높이 점프!<br>
+                    자동으로 발동됩니다.
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>그냥 밟으면 자동 점프!</li>
+                        <li>공중에서 W키로 방향 조절</li>
+                        <li>다음 패드 위치 미리 확인</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableJumpPads = true/false</code></p>
+                    <p>점프력: 85 (코드 내 고정)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 3. 슬라임 -->
+        <div class="gimmick-card slime">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🟩</div>
+                <div class="gimmick-title">
+                    <h3>슬라임 구역 <span class="difficulty easy">쉬움</span></h3>
+                    <div class="location">📍 830m~890m, 1700m~1750m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element"></div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    초록색 반투명 바닥입니다.<br>
+                    밟으면 이동 속도가 50% 감소!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>점프하면서 지나가기</li>
+                        <li>슬라이드는 효과 없음</li>
+                        <li>🚀 부스터 아이템 사용!</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableSlime = true/false</code></p>
+                    <p>감속률: <code>SlimeSlowFactor = 0.5</code> (50%)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 4. 펀칭 글러브 -->
+        <div class="gimmick-card punching-glove">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🥊</div>
+                <div class="gimmick-title">
+                    <h3>펀칭 글러브 <span class="difficulty medium">보통</span></h3>
+                    <div class="location">📍 1280m, 1320m, 1360m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element"></div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    벽에서 주기적으로 튀어나오는 글러브!<br>
+                    맞으면 크게 튕겨납니다.
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>펀치 타이밍 파악하기</li>
+                        <li>펀치 후 바로 통과</li>
+                        <li>🛡️ 쉴드 아이템으로 무시</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnablePunchingGloves = true/false</code></p>
+                    <p>주기: 1.3초마다 펀치</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 5. 퀴즈 게이트 -->
+        <div class="gimmick-card quiz-gate">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">❓</div>
+                <div class="gimmick-title">
+                    <h3>퀴즈 게이트 <span class="difficulty medium">보통</span></h3>
+                    <div class="location">📍 180m, 350m, 990m, 1450m, 1830m, 1990m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element">
+                    <div class="gate" style="background: #ff5555;">1</div>
+                    <div class="gate" style="background: #5588ff;">2</div>
+                    <div class="gate" style="background: #ffdd55;">3</div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    퀴즈 문제가 화면에 표시됩니다!<br>
+                    정답 게이트로 통과하세요. 오답 시 튕겨남!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>문제를 빨리 읽기!</li>
+                        <li>게이트 색상과 번호 확인</li>
+                        <li>오답 시 1.2초 스턴</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableQuizGates = true/false</code></p>
+                    <p>선택지: 2~4개</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 6. 엘리베이터 -->
+        <div class="gimmick-card elevator">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🛗</div>
+                <div class="gimmick-title">
+                    <h3>퀴즈 엘리베이터 <span class="difficulty hard">어려움</span></h3>
+                    <div class="location">📍 670m, 1550m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element">
+                    <div class="platform" style="background: #ff5555;">1</div>
+                    <div class="platform up" style="background: #55ff55;">2✓</div>
+                    <div class="platform" style="background: #5555ff;">3</div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    구멍 위에 여러 플랫폼이 있습니다!<br>
+                    정답 플랫폼만 올라옵니다. 오답 시 추락!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>퀴즈 보고 정답 플랫폼 탑승</li>
+                        <li>3초 후 올라옴</li>
+                        <li>틀리면 아래로 떨어짐!</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableElevators = true/false</code></p>
+                    <p>대기 시간: 3초</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 7. 사라지는 다리 -->
+        <div class="gimmick-card disappearing-bridge">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🌉</div>
+                <div class="gimmick-title">
+                    <h3>사라지는 다리 <span class="difficulty hard">어려움</span></h3>
+                    <div class="location">📍 720m~800m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element">
+                    <div class="plat"></div>
+                    <div class="plat"></div>
+                    <div class="plat"></div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    플랫폼을 밟으면 빨간색으로 변하고 1.5초 후 사라짐!<br>
+                    아래는 용암! 빠르게 점프하세요!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>멈추지 말고 계속 점프!</li>
+                        <li>지그재그 패턴 (좌→우→좌)</li>
+                        <li>3.5초 후 다시 생성됨</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableDisappearingBridge = true/false</code></p>
+                    <p>사라짐: 1.5초 / 재생성: 3.5초</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 8. 컨베이어 벨트 -->
+        <div class="gimmick-card conveyor">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">⬅️</div>
+                <div class="gimmick-title">
+                    <h3>컨베이어 벨트 <span class="difficulty medium">보통</span></h3>
+                    <div class="location">📍 1040m~1100m, 1860m~1900m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element">
+                    <span class="arrow">◀◀◀</span>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    회색 바닥이 플레이어를 뒤로 밀어냅니다!<br>
+                    열심히 앞으로 달려야 합니다.
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>W키 꾹 + 점프 반복!</li>
+                        <li>점프 중엔 밀리지 않음</li>
+                        <li>🚀 부스터 아이템 사용!</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableConveyorBelt = true/false</code></p>
+                    <p>속도: 0.15 (코드 내 설정)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 9. 전기 바닥 -->
+        <div class="gimmick-card electric-floor">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">⚡</div>
+                <div class="gimmick-title">
+                    <h3>전기 바닥 <span class="difficulty medium">보통</span></h3>
+                    <div class="location">📍 1120m~1170m, 1910m~1945m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element"></div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    바닥 색이 노란색 ↔ 파란색으로 바뀝니다!<br>
+                    파란색(감전)일 때 밟으면 0.8초 스턴!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>노란색일 때 달리기!</li>
+                        <li>파란색 되기 전에 통과</li>
+                        <li>타이밍: 노란색 1초 → 파란색 0.5초</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableElectricFloor = true/false</code></p>
+                    <p>스턴 시간: 0.8초</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 10. 굴러오는 바위 -->
+        <div class="gimmick-card boulder">
+            <div class="gimmick-header">
+                <div class="gimmick-icon">🪨</div>
+                <div class="gimmick-title">
+                    <h3>굴러오는 바위 <span class="difficulty hard">어려움</span></h3>
+                    <div class="location">📍 1220m~1380m</div>
+                </div>
+            </div>
+            <div class="gimmick-visual">
+                <div class="visual-element"></div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">
+                    앞에서 큰 바위가 굴러옵니다!<br>
+                    ⚠️ 경고 표지판이 있습니다. 맞으면 크게 튕겨남!
+                </p>
+                <div class="gimmick-tips">
+                    <h4>💡 통과 팁</h4>
+                    <ul>
+                        <li>벽 쪽으로 피하기!</li>
+                        <li>바위는 중앙으로 굴러옴</li>
+                        <li>바위 지나간 후 빠르게 달리기</li>
+                    </ul>
+                </div>
+                <div class="config-box">
+                    <h4>⚙️ 설정값</h4>
+                    <p>활성화: <code>EnableRollingBoulder = true/false</code></p>
+                    <p>주기: 7초마다 / 속도: 45</p>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <h2 class="section-title">🎒 아이템</h2>
+    
+    <div class="gimmick-grid">
+        <div class="gimmick-card" style="border-color: #ffcc00;">
+            <div class="gimmick-header" style="background: linear-gradient(135deg, #ffcc00, #ff9900);">
+                <div class="gimmick-icon" style="background: rgba(255, 200, 0, 0.3);">🍌</div>
+                <div class="gimmick-title">
+                    <h3>바나나</h3>
+                    <div class="location">뒤에 드랍</div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">Q키로 뒤에 바나나를 놓습니다. 다른 플레이어가 밟으면 1.5초 스턴!</p>
+            </div>
+        </div>
+        
+        <div class="gimmick-card" style="border-color: #ff4444;">
+            <div class="gimmick-header" style="background: linear-gradient(135deg, #ff4444, #cc0000);">
+                <div class="gimmick-icon" style="background: rgba(255, 0, 0, 0.3);">🚀</div>
+                <div class="gimmick-title">
+                    <h3>부스터</h3>
+                    <div class="location">즉시 사용</div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">Q키로 사용하면 4.5초간 속도 60% 증가!</p>
+            </div>
+        </div>
+        
+        <div class="gimmick-card" style="border-color: #44aaff;">
+            <div class="gimmick-header" style="background: linear-gradient(135deg, #44aaff, #0066cc);">
+                <div class="gimmick-icon" style="background: rgba(0, 100, 255, 0.3);">🛡️</div>
+                <div class="gimmick-title">
+                    <h3>쉴드</h3>
+                    <div class="location">14초 지속</div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">Q키로 사용하면 14초간 보호막 생성! 장애물 무시 가능!</p>
+            </div>
+        </div>
+        
+        <div class="gimmick-card" style="border-color: #ffff44;">
+            <div class="gimmick-header" style="background: linear-gradient(135deg, #ffff44, #aaaa00);">
+                <div class="gimmick-icon" style="background: rgba(255, 255, 0, 0.3);">⚡</div>
+                <div class="gimmick-title">
+                    <h3>번개</h3>
+                    <div class="location">전체 대상</div>
+                </div>
+            </div>
+            <div class="gimmick-body">
+                <p class="gimmick-desc">Q키로 사용하면 모든 다른 플레이어 1.8초간 속도 감소!</p>
+            </div>
+        </div>
+    </div>
+    
+    <h2 class="section-title">⌨️ 조작법</h2>
+    
+    <div class="config-box" style="font-size: 1.2em; padding: 25px;">
+        <p><code>W A S D</code> - 이동</p>
+        <p><code>Space</code> - 점프</p>
+        <p><code>Q</code> - 아이템 사용</p>
+    </div>
+    
+    <div style="text-align: center; margin-top: 50px; color: #666;">
+        <p>🏰 Quiz Castle v3 - Gimmick Guide</p>
+        <p>Made with ❤️</p>
+    </div>
+</body>
+</html>
