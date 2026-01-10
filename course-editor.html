@@ -972,8 +972,12 @@
                 <button onclick="set3DCamera('top')" id="camTop">⬇️ 탑뷰</button>
                 <button onclick="set3DCamera('side')" id="camSide">➡️ 사이드뷰</button>
                 <button onclick="set3DCamera('first')" id="camFirst">👤 1인칭</button>
-                <button onclick="toggle3DAnimation()" id="btnAnimate">▶️ 애니메이션</button>
+                <button onclick="toggle3DAnimation()" id="btnAnimate">▶️ 기믹 애니메이션</button>
                 <button onclick="reset3DCamera()">🔄 카메라 리셋</button>
+                <span style="border-left: 1px solid #4a4a8a; margin: 0 5px;"></span>
+                <button onclick="togglePlayerRun()" id="btnRun" style="background: linear-gradient(135deg, #f093fb, #f5576c);">🏃 플레이어 달리기</button>
+                <button onclick="toggleFollowCamera()" id="btnFollow">📹 카메라 추적</button>
+                <button onclick="resetPlayer()">↩️ 플레이어 리셋</button>
             </div>
             <div class="preview3d-info">
                 💡 마우스 드래그로 회전, 스크롤로 줌, 우클릭 드래그로 이동
@@ -1629,6 +1633,14 @@ return CustomCourseData`;
         let gimmickMeshes = [];
         const SCALE_3D = 0.05; // Scale factor for 3D view
 
+        // Player character
+        let playerGroup = null;
+        let playerRunning = false;
+        let playerPosition = 0;
+        let playerSpeed = 0.15;
+        let followCamera = false;
+        let runAnimationTime = 0;
+
         // 3D Colors
         const COLORS_3D = {
             track: 0x444444,
@@ -1667,6 +1679,12 @@ return CustomCourseData`;
                 const canvas = document.getElementById('preview3DCanvas');
                 canvas.innerHTML = '';
             }
+            // Reset player state
+            playerGroup = null;
+            playerRunning = false;
+            playerPosition = 0;
+            followCamera = false;
+            runAnimationTime = 0;
         }
 
         function init3DScene() {
@@ -1778,6 +1796,9 @@ return CustomCourseData`;
             // Update controls target
             controls3D.target.set(0, 1, trackLength / 2);
             controls3D.update();
+
+            // Create player character
+            createPlayer();
         }
 
         function create3DGimmick(gimmick, index) {
@@ -1980,7 +2001,7 @@ return CustomCourseData`;
         function animate3D() {
             animationId = requestAnimationFrame(animate3D);
 
-            // Animate rotating bars
+            // Animate gimmicks
             if (animating3D) {
                 gimmickMeshes.forEach(mesh => {
                     if (mesh.userData && mesh.userData.type === 'rotating') {
@@ -1997,6 +2018,9 @@ return CustomCourseData`;
                     }
                 });
             }
+
+            // Animate player
+            animatePlayer();
 
             controls3D.update();
             renderer3D.render(scene3D, camera3D);
@@ -2046,7 +2070,258 @@ return CustomCourseData`;
                 btn.textContent = '⏸️ 일시정지';
                 btn.classList.add('active');
             } else {
-                btn.textContent = '▶️ 애니메이션';
+                btn.textContent = '▶️ 기믹 애니메이션';
+                btn.classList.remove('active');
+            }
+        }
+
+        // ============================================
+        // PLAYER CHARACTER
+        // ============================================
+        function createPlayer() {
+            playerGroup = new THREE.Group();
+
+            // Body (torso)
+            const bodyGeometry = new THREE.BoxGeometry(0.3, 0.4, 0.15);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x3498db });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.5;
+            body.castShadow = true;
+            body.name = 'body';
+            playerGroup.add(body);
+
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xfdbf6f });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 0.82;
+            head.castShadow = true;
+            head.name = 'head';
+            playerGroup.add(head);
+
+            // Hair
+            const hairGeometry = new THREE.SphereGeometry(0.1, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+            const hairMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+            const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+            hair.position.y = 0.88;
+            hair.name = 'hair';
+            playerGroup.add(hair);
+
+            // Left Arm
+            const armGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+            const armMaterial = new THREE.MeshLambertMaterial({ color: 0x3498db });
+
+            const leftArm = new THREE.Group();
+            const leftArmMesh = new THREE.Mesh(armGeometry, armMaterial);
+            leftArmMesh.position.y = -0.15;
+            leftArmMesh.castShadow = true;
+            leftArm.add(leftArmMesh);
+            leftArm.position.set(-0.22, 0.6, 0);
+            leftArm.name = 'leftArm';
+            playerGroup.add(leftArm);
+
+            // Right Arm
+            const rightArm = new THREE.Group();
+            const rightArmMesh = new THREE.Mesh(armGeometry, armMaterial);
+            rightArmMesh.position.y = -0.15;
+            rightArmMesh.castShadow = true;
+            rightArm.add(rightArmMesh);
+            rightArm.position.set(0.22, 0.6, 0);
+            rightArm.name = 'rightArm';
+            playerGroup.add(rightArm);
+
+            // Left Leg
+            const legGeometry = new THREE.BoxGeometry(0.1, 0.3, 0.1);
+            const legMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+
+            const leftLeg = new THREE.Group();
+            const leftLegMesh = new THREE.Mesh(legGeometry, legMaterial);
+            leftLegMesh.position.y = -0.15;
+            leftLegMesh.castShadow = true;
+            leftLeg.add(leftLegMesh);
+            leftLeg.position.set(-0.08, 0.28, 0);
+            leftLeg.name = 'leftLeg';
+            playerGroup.add(leftLeg);
+
+            // Right Leg
+            const rightLeg = new THREE.Group();
+            const rightLegMesh = new THREE.Mesh(legGeometry, legMaterial);
+            rightLegMesh.position.y = -0.15;
+            rightLegMesh.castShadow = true;
+            rightLeg.add(rightLegMesh);
+            rightLeg.position.set(0.08, 0.28, 0);
+            rightLeg.name = 'rightLeg';
+            playerGroup.add(rightLeg);
+
+            // Shoes
+            const shoeGeometry = new THREE.BoxGeometry(0.12, 0.06, 0.18);
+            const shoeMaterial = new THREE.MeshLambertMaterial({ color: 0xe74c3c });
+
+            const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            leftShoe.position.set(-0.08, 0.03, 0.02);
+            leftShoe.name = 'leftShoe';
+            playerGroup.add(leftShoe);
+
+            const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            rightShoe.position.set(0.08, 0.03, 0.02);
+            rightShoe.name = 'rightShoe';
+            playerGroup.add(rightShoe);
+
+            // Position player at start
+            playerGroup.position.set(0, 0.1, 0.5);
+            playerPosition = 0.5;
+
+            scene3D.add(playerGroup);
+            gimmickMeshes.push(playerGroup);
+        }
+
+        function animatePlayer() {
+            if (!playerGroup) return;
+
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 2000;
+            const trackLength = courseLength * SCALE_3D;
+
+            if (playerRunning) {
+                runAnimationTime += 0.15;
+
+                // Move forward
+                playerPosition += playerSpeed;
+                if (playerPosition > trackLength) {
+                    playerPosition = 0.5;
+                }
+                playerGroup.position.z = playerPosition;
+
+                // Running animation
+                const runCycle = Math.sin(runAnimationTime * 2);
+                const runCycle2 = Math.cos(runAnimationTime * 2);
+
+                // Find limbs
+                playerGroup.children.forEach(child => {
+                    if (child.name === 'leftArm') {
+                        child.rotation.x = runCycle * 0.8;
+                    }
+                    if (child.name === 'rightArm') {
+                        child.rotation.x = -runCycle * 0.8;
+                    }
+                    if (child.name === 'leftLeg') {
+                        child.rotation.x = -runCycle * 0.6;
+                    }
+                    if (child.name === 'rightLeg') {
+                        child.rotation.x = runCycle * 0.6;
+                    }
+                    if (child.name === 'body') {
+                        child.rotation.z = runCycle * 0.05;
+                        child.position.y = 0.5 + Math.abs(runCycle2) * 0.03;
+                    }
+                    if (child.name === 'head') {
+                        child.position.y = 0.82 + Math.abs(runCycle2) * 0.03;
+                    }
+                    if (child.name === 'hair') {
+                        child.position.y = 0.88 + Math.abs(runCycle2) * 0.03;
+                    }
+                });
+
+                // Update shoe positions with leg movement
+                const leftLeg = playerGroup.children.find(c => c.name === 'leftLeg');
+                const rightLeg = playerGroup.children.find(c => c.name === 'rightLeg');
+                const leftShoe = playerGroup.children.find(c => c.name === 'leftShoe');
+                const rightShoe = playerGroup.children.find(c => c.name === 'rightShoe');
+
+                if (leftShoe && leftLeg) {
+                    leftShoe.position.z = 0.02 + Math.sin(-runCycle * 0.6) * 0.15;
+                    leftShoe.position.y = 0.03 + Math.max(0, -Math.sin(-runCycle * 0.6)) * 0.1;
+                }
+                if (rightShoe && rightLeg) {
+                    rightShoe.position.z = 0.02 + Math.sin(runCycle * 0.6) * 0.15;
+                    rightShoe.position.y = 0.03 + Math.max(0, -Math.sin(runCycle * 0.6)) * 0.1;
+                }
+
+                // Camera follow
+                if (followCamera) {
+                    const offset = new THREE.Vector3(3, 2, -4);
+                    camera3D.position.set(
+                        playerGroup.position.x + offset.x,
+                        playerGroup.position.y + offset.y,
+                        playerGroup.position.z + offset.z
+                    );
+                    controls3D.target.set(
+                        playerGroup.position.x,
+                        playerGroup.position.y + 0.5,
+                        playerGroup.position.z + 2
+                    );
+                }
+            } else {
+                // Idle animation (subtle breathing)
+                runAnimationTime += 0.02;
+                const breathe = Math.sin(runAnimationTime) * 0.01;
+
+                playerGroup.children.forEach(child => {
+                    if (child.name === 'body') {
+                        child.position.y = 0.5 + breathe;
+                        child.rotation.x = 0;
+                        child.rotation.z = 0;
+                    }
+                    if (child.name === 'head') {
+                        child.position.y = 0.82 + breathe;
+                    }
+                    if (child.name === 'hair') {
+                        child.position.y = 0.88 + breathe;
+                    }
+                    if (child.name === 'leftArm' || child.name === 'rightArm') {
+                        child.rotation.x = 0;
+                    }
+                    if (child.name === 'leftLeg' || child.name === 'rightLeg') {
+                        child.rotation.x = 0;
+                    }
+                });
+
+                // Reset shoes
+                const leftShoe = playerGroup.children.find(c => c.name === 'leftShoe');
+                const rightShoe = playerGroup.children.find(c => c.name === 'rightShoe');
+                if (leftShoe) {
+                    leftShoe.position.z = 0.02;
+                    leftShoe.position.y = 0.03;
+                }
+                if (rightShoe) {
+                    rightShoe.position.z = 0.02;
+                    rightShoe.position.y = 0.03;
+                }
+            }
+        }
+
+        function togglePlayerRun() {
+            playerRunning = !playerRunning;
+            const btn = document.getElementById('btnRun');
+            if (playerRunning) {
+                btn.textContent = '⏹️ 정지';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = '🏃 플레이어 달리기';
+                btn.classList.remove('active');
+            }
+        }
+
+        function toggleFollowCamera() {
+            followCamera = !followCamera;
+            const btn = document.getElementById('btnFollow');
+            if (followCamera) {
+                btn.textContent = '📹 추적 중';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = '📹 카메라 추적';
+                btn.classList.remove('active');
+                // Reset to quarter view
+                set3DCamera('quarter');
+            }
+        }
+
+        function resetPlayer() {
+            if (playerGroup) {
+                playerPosition = 0.5;
+                playerGroup.position.z = playerPosition;
+                playerRunning = false;
+                const btn = document.getElementById('btnRun');
+                btn.textContent = '🏃 플레이어 달리기';
                 btn.classList.remove('active');
             }
         }
