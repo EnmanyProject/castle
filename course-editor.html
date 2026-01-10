@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz Castle - Course Editor</title>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
         * {
             margin: 0;
@@ -661,6 +664,49 @@
             font-size: 1.2rem;
         }
 
+        /* 3D Preview */
+        #preview3DCanvas {
+            width: 100%;
+            height: 500px;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        .preview3d-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .preview3d-controls button {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #4a4a8a;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preview3d-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .preview3d-controls button.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: transparent;
+        }
+
+        .preview3d-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
         /* Stats Bar */
         .stats-bar {
             display: flex;
@@ -694,7 +740,8 @@
         <div class="header-buttons">
             <button class="btn btn-primary" onclick="newCourse()">📄 New</button>
             <button class="btn btn-primary" onclick="loadFromJson()">📂 Load</button>
-            <button class="btn btn-warning" onclick="showPreviewModal()">👁️ Preview</button>
+            <button class="btn btn-warning" onclick="showPreviewModal()">👁️ 2D</button>
+            <button class="btn btn-warning" onclick="show3DPreview()" style="background: linear-gradient(135deg, #11998e, #38ef7d);">🎮 3D</button>
             <button class="btn btn-success" onclick="showExportModal()">💾 Export</button>
         </div>
     </header>
@@ -908,6 +955,28 @@
                 <div class="legend-item"><span class="legend-icon">⚡</span> 전기 바닥</div>
                 <div class="legend-item"><span class="legend-icon">🪨</span> 바위</div>
                 <div class="legend-item"><span class="legend-icon">⏰</span> 사라지는 다리</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Preview Modal -->
+    <div class="modal-overlay" id="preview3DModal">
+        <div class="modal" style="max-width: 95%; width: 1400px;">
+            <div class="modal-header">
+                <h2>🎮 3D Course Preview</h2>
+                <button class="modal-close" onclick="close3DPreview()">×</button>
+            </div>
+            <div id="preview3DCanvas"></div>
+            <div class="preview3d-controls">
+                <button onclick="set3DCamera('quarter')" class="active" id="camQuarter">🎯 쿼터뷰</button>
+                <button onclick="set3DCamera('top')" id="camTop">⬇️ 탑뷰</button>
+                <button onclick="set3DCamera('side')" id="camSide">➡️ 사이드뷰</button>
+                <button onclick="set3DCamera('first')" id="camFirst">👤 1인칭</button>
+                <button onclick="toggle3DAnimation()" id="btnAnimate">▶️ 애니메이션</button>
+                <button onclick="reset3DCamera()">🔄 카메라 리셋</button>
+            </div>
+            <div class="preview3d-info">
+                💡 마우스 드래그로 회전, 스크롤로 줌, 우클릭 드래그로 이동
             </div>
         </div>
     </div>
@@ -1548,6 +1617,437 @@ return CustomCourseData`;
                 `;
                 marker.textContent = `Z:${z}`;
                 gimmicksContainer.appendChild(marker);
+            }
+        }
+
+        // ============================================
+        // 3D PREVIEW (Three.js)
+        // ============================================
+        let scene3D, camera3D, renderer3D, controls3D;
+        let animating3D = false;
+        let animationId = null;
+        let gimmickMeshes = [];
+        const SCALE_3D = 0.05; // Scale factor for 3D view
+
+        // 3D Colors
+        const COLORS_3D = {
+            track: 0x444444,
+            trackLine: 0xffffff,
+            sky: 0x87CEEB,
+            grass: 0x228B22,
+            rotatingBar: 0xff4444,
+            jumpPad: 0x44ff44,
+            slime: 0x7FFF00,
+            quizGate: 0x4444ff,
+            elevator: 0x8844ff,
+            conveyor: 0x666666,
+            electric: 0xFFD700,
+            punching: 0xDC143C,
+            boulder: 0x8B4513,
+            bridge: 0x888888,
+            start: 0x00ff00,
+            finish: 0xff0000
+        };
+
+        function show3DPreview() {
+            document.getElementById('preview3DModal').classList.add('active');
+            init3DScene();
+            render3DCourse();
+            animate3D();
+        }
+
+        function close3DPreview() {
+            document.getElementById('preview3DModal').classList.remove('active');
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            if (renderer3D) {
+                renderer3D.dispose();
+                const canvas = document.getElementById('preview3DCanvas');
+                canvas.innerHTML = '';
+            }
+        }
+
+        function init3DScene() {
+            const container = document.getElementById('preview3DCanvas');
+            container.innerHTML = '';
+
+            const width = container.clientWidth;
+            const height = 500;
+
+            // Scene
+            scene3D = new THREE.Scene();
+            scene3D.background = new THREE.Color(0x87CEEB);
+            scene3D.fog = new THREE.Fog(0x87CEEB, 50, 200);
+
+            // Camera
+            camera3D = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+
+            // Renderer
+            renderer3D = new THREE.WebGLRenderer({ antialias: true });
+            renderer3D.setSize(width, height);
+            renderer3D.shadowMap.enabled = true;
+            renderer3D.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer3D.domElement);
+
+            // Controls
+            controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement);
+            controls3D.enableDamping = true;
+            controls3D.dampingFactor = 0.05;
+            controls3D.maxPolarAngle = Math.PI / 2;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene3D.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            scene3D.add(directionalLight);
+
+            // Set quarter view camera
+            set3DCamera('quarter');
+        }
+
+        function render3DCourse() {
+            // Clear previous gimmicks
+            gimmickMeshes.forEach(mesh => scene3D.remove(mesh));
+            gimmickMeshes = [];
+
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 2000;
+            const trackLength = courseLength * SCALE_3D;
+            const trackWidth = 30 * SCALE_3D;
+
+            // Ground (grass)
+            const groundGeometry = new THREE.PlaneGeometry(trackWidth * 3, trackLength + 20);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.grass });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(0, -0.1, trackLength / 2);
+            ground.receiveShadow = true;
+            scene3D.add(ground);
+            gimmickMeshes.push(ground);
+
+            // Track
+            const trackGeometry = new THREE.BoxGeometry(trackWidth, 0.2, trackLength);
+            const trackMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.track });
+            const track = new THREE.Mesh(trackGeometry, trackMaterial);
+            track.position.set(0, 0, trackLength / 2);
+            track.receiveShadow = true;
+            scene3D.add(track);
+            gimmickMeshes.push(track);
+
+            // Track lines
+            const lineGeometry = new THREE.BoxGeometry(0.05, 0.01, trackLength);
+            const lineMaterial = new THREE.MeshBasicMaterial({ color: COLORS_3D.trackLine });
+            const centerLine = new THREE.Mesh(lineGeometry, lineMaterial);
+            centerLine.position.set(0, 0.11, trackLength / 2);
+            scene3D.add(centerLine);
+            gimmickMeshes.push(centerLine);
+
+            // Start marker
+            const startGeometry = new THREE.BoxGeometry(trackWidth, 0.5, 0.2);
+            const startMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.start });
+            const startMarker = new THREE.Mesh(startGeometry, startMaterial);
+            startMarker.position.set(0, 0.25, 0);
+            scene3D.add(startMarker);
+            gimmickMeshes.push(startMarker);
+
+            // Finish marker
+            const finishGeometry = new THREE.BoxGeometry(trackWidth, 3, 0.2);
+            const finishMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.finish });
+            const finishMarker = new THREE.Mesh(finishGeometry, finishMaterial);
+            finishMarker.position.set(0, 1.5, trackLength);
+            scene3D.add(finishMarker);
+            gimmickMeshes.push(finishMarker);
+
+            // Render each gimmick
+            courseGimmicks.forEach((gimmick, index) => {
+                const mesh = create3DGimmick(gimmick, index);
+                if (mesh) {
+                    scene3D.add(mesh);
+                    gimmickMeshes.push(mesh);
+                }
+            });
+
+            // Update controls target
+            controls3D.target.set(0, 1, trackLength / 2);
+            controls3D.update();
+        }
+
+        function create3DGimmick(gimmick, index) {
+            const z = (gimmick.z || gimmick.triggerZ || gimmick.zStart || 0) * SCALE_3D;
+            let mesh;
+
+            switch (gimmick.type) {
+                case 'RotatingBar': {
+                    const width = (gimmick.width || 28) * SCALE_3D;
+                    const height = (gimmick.height || 3) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(width, 0.15, 0.15);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.rotatingBar });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, height, z);
+                    mesh.castShadow = true;
+                    mesh.userData = { type: 'rotating', speed: gimmick.speed || 1.5 };
+                    break;
+                }
+
+                case 'JumpPad': {
+                    const geometry = new THREE.CylinderGeometry(0.4, 0.5, 0.1, 8);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.jumpPad });
+                    mesh = new THREE.Mesh(geometry, material);
+                    const x = (gimmick.x || 0) * SCALE_3D;
+                    mesh.position.set(x, 0.15, z);
+                    mesh.castShadow = true;
+                    break;
+                }
+
+                case 'SlimeZone': {
+                    const length = (gimmick.length || 80) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(1.4, 0.05, length);
+                    const material = new THREE.MeshLambertMaterial({
+                        color: COLORS_3D.slime,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.12, z + length/2);
+                    break;
+                }
+
+                case 'QuizGate': {
+                    const group = new THREE.Group();
+                    const options = gimmick.options || 2;
+                    const gateWidth = 1.4 / options;
+
+                    for (let i = 0; i < options; i++) {
+                        // Gate frame
+                        const frameGeometry = new THREE.BoxGeometry(gateWidth - 0.05, 1.2, 0.1);
+                        const frameMaterial = new THREE.MeshLambertMaterial({
+                            color: i === 0 ? 0x00ff00 : COLORS_3D.quizGate
+                        });
+                        const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+                        frame.position.x = (i - (options-1)/2) * gateWidth;
+                        frame.position.y = 0.6;
+                        frame.castShadow = true;
+                        group.add(frame);
+                    }
+
+                    const gateZ = (gimmick.gateZ || gimmick.triggerZ + 30) * SCALE_3D;
+                    group.position.set(0, 0, gateZ);
+                    mesh = group;
+                    break;
+                }
+
+                case 'Elevator': {
+                    const group = new THREE.Group();
+                    const options = gimmick.options || 3;
+                    const platWidth = 1.4 / options;
+
+                    for (let i = 0; i < options; i++) {
+                        const platGeometry = new THREE.BoxGeometry(platWidth - 0.05, 0.15, 0.6);
+                        const platMaterial = new THREE.MeshLambertMaterial({
+                            color: i === 0 ? 0x00ff00 : COLORS_3D.elevator
+                        });
+                        const plat = new THREE.Mesh(platGeometry, platMaterial);
+                        plat.position.x = (i - (options-1)/2) * platWidth;
+                        plat.position.y = 0.15;
+                        plat.castShadow = true;
+                        group.add(plat);
+                    }
+
+                    const elevZ = (gimmick.elevZ || gimmick.triggerZ + 50) * SCALE_3D;
+                    group.position.set(0, 0, elevZ);
+                    mesh = group;
+                    break;
+                }
+
+                case 'ConveyorBelt': {
+                    const length = (gimmick.length || 60) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(1.2, 0.08, length);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.conveyor });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.14, z + length/2);
+
+                    // Arrow indicator
+                    const arrowGeometry = new THREE.ConeGeometry(0.1, 0.2, 4);
+                    const arrowMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+                    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
+                    arrow.rotation.x = gimmick.direction < 0 ? Math.PI/2 : -Math.PI/2;
+                    arrow.position.set(0, 0.2, z + length/2);
+                    scene3D.add(arrow);
+                    gimmickMeshes.push(arrow);
+                    break;
+                }
+
+                case 'ElectricFloor': {
+                    const length = (gimmick.length || 60) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(1.4, 0.05, length);
+                    const material = new THREE.MeshLambertMaterial({
+                        color: COLORS_3D.electric,
+                        emissive: COLORS_3D.electric,
+                        emissiveIntensity: 0.3
+                    });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.12, z + length/2);
+                    mesh.userData = { type: 'electric' };
+                    break;
+                }
+
+                case 'PunchingCorridor': {
+                    const length = (gimmick.length || 100) * SCALE_3D;
+                    const group = new THREE.Group();
+
+                    // Corridor walls
+                    const wallGeometry = new THREE.BoxGeometry(0.1, 0.8, length);
+                    const wallMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.punching });
+
+                    const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
+                    leftWall.position.set(-0.75, 0.4, 0);
+                    leftWall.castShadow = true;
+                    group.add(leftWall);
+
+                    const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
+                    rightWall.position.set(0.75, 0.4, 0);
+                    rightWall.castShadow = true;
+                    group.add(rightWall);
+
+                    // Punching gloves
+                    const gloveGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+                    const gloveMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+                    for (let i = 0; i < 3; i++) {
+                        const glove = new THREE.Mesh(gloveGeometry, gloveMaterial);
+                        glove.position.set(i % 2 === 0 ? -0.5 : 0.5, 0.4, (i - 1) * length/3);
+                        group.add(glove);
+                    }
+
+                    group.position.set(0, 0, z + length/2);
+                    mesh = group;
+                    break;
+                }
+
+                case 'RollingBoulder': {
+                    const geometry = new THREE.SphereGeometry(0.4, 16, 16);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.boulder });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.5, z);
+                    mesh.castShadow = true;
+                    mesh.userData = {
+                        type: 'boulder',
+                        zStart: z,
+                        zEnd: (gimmick.zEnd || gimmick.zStart + 100) * SCALE_3D
+                    };
+                    break;
+                }
+
+                case 'DisappearingBridge': {
+                    const group = new THREE.Group();
+                    const count = gimmick.platformCount || 6;
+                    const platWidth = 1.4 / 2;
+
+                    for (let i = 0; i < count; i++) {
+                        const platGeometry = new THREE.BoxGeometry(platWidth, 0.1, 0.4);
+                        const platMaterial = new THREE.MeshLambertMaterial({
+                            color: COLORS_3D.bridge,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const plat = new THREE.Mesh(platGeometry, platMaterial);
+                        plat.position.x = (i % 2 === 0 ? -1 : 1) * platWidth/2;
+                        plat.position.y = 0.15;
+                        plat.position.z = i * 0.5;
+                        plat.castShadow = true;
+                        group.add(plat);
+                    }
+
+                    group.position.set(0, 0, z);
+                    mesh = group;
+                    break;
+                }
+
+                default:
+                    return null;
+            }
+
+            return mesh;
+        }
+
+        function animate3D() {
+            animationId = requestAnimationFrame(animate3D);
+
+            // Animate rotating bars
+            if (animating3D) {
+                gimmickMeshes.forEach(mesh => {
+                    if (mesh.userData && mesh.userData.type === 'rotating') {
+                        mesh.rotation.y += mesh.userData.speed * 0.02;
+                    }
+                    if (mesh.userData && mesh.userData.type === 'boulder') {
+                        const range = mesh.userData.zEnd - mesh.userData.zStart;
+                        mesh.position.z = mesh.userData.zStart +
+                            (Math.sin(Date.now() * 0.001) * 0.5 + 0.5) * range;
+                        mesh.rotation.x += 0.05;
+                    }
+                    if (mesh.userData && mesh.userData.type === 'electric') {
+                        mesh.material.emissiveIntensity = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
+                    }
+                });
+            }
+
+            controls3D.update();
+            renderer3D.render(scene3D, camera3D);
+        }
+
+        function set3DCamera(view) {
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 2000;
+            const trackLength = courseLength * SCALE_3D;
+            const centerZ = trackLength / 2;
+
+            // Update button states
+            document.querySelectorAll('.preview3d-controls button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            switch (view) {
+                case 'quarter':
+                    camera3D.position.set(15, 12, centerZ - 10);
+                    document.getElementById('camQuarter').classList.add('active');
+                    break;
+                case 'top':
+                    camera3D.position.set(0, 30, centerZ);
+                    document.getElementById('camTop').classList.add('active');
+                    break;
+                case 'side':
+                    camera3D.position.set(20, 5, centerZ);
+                    document.getElementById('camSide').classList.add('active');
+                    break;
+                case 'first':
+                    camera3D.position.set(0, 1, 2);
+                    document.getElementById('camFirst').classList.add('active');
+                    break;
+            }
+
+            controls3D.target.set(0, 1, centerZ);
+            controls3D.update();
+        }
+
+        function reset3DCamera() {
+            set3DCamera('quarter');
+        }
+
+        function toggle3DAnimation() {
+            animating3D = !animating3D;
+            const btn = document.getElementById('btnAnimate');
+            if (animating3D) {
+                btn.textContent = '⏸️ 일시정지';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = '▶️ 애니메이션';
+                btn.classList.remove('active');
             }
         }
     </script>
