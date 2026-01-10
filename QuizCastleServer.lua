@@ -113,6 +113,49 @@ local RotatingObjects = {}  -- {part, speed, rotation, rotationType}
 local ItemBoxes = {}  -- {part, rotation}
 
 -- ============================================
+-- 🧩 GIMMICK REGISTRY SYSTEM
+-- ============================================
+local GimmickRegistry = {
+    builders = {},   -- 기믹 생성 함수
+    schemas = {},    -- 기믹 파라미터 스키마
+    metadata = {}    -- 기믹 메타데이터 (이름, 아이콘, 난이도 등)
+}
+
+function GimmickRegistry:Register(config)
+    local name = config.name
+    self.schemas[name] = config.schema
+    self.builders[name] = config.builder
+    self.metadata[name] = {
+        displayName = config.displayName or name,
+        icon = config.icon or "❓",
+        difficulty = config.difficulty or "medium",
+        description = config.description or ""
+    }
+end
+
+function GimmickRegistry:Build(gimmickType, parent, data)
+    local builder = self.builders[gimmickType]
+    if builder then
+        return builder(parent, data)
+    else
+        warn("[GimmickRegistry] Unknown type:", gimmickType)
+        return nil
+    end
+end
+
+function GimmickRegistry:GetSchema(gimmickType)
+    return self.schemas[gimmickType]
+end
+
+function GimmickRegistry:GetAllTypes()
+    local types = {}
+    for name, _ in pairs(self.builders) do
+        table.insert(types, name)
+    end
+    return types
+end
+
+-- ============================================
 -- REMOTE EVENTS
 -- ============================================
 local remoteFolder = ReplicatedStorage:FindFirstChild("RemoteEvents")
@@ -318,6 +361,981 @@ local gateColors = {
     Color3.fromRGB(255, 220, 80),
     Color3.fromRGB(80, 220, 80)
 }
+
+-- ============================================
+-- 🧩 GIMMICK REGISTRATIONS
+-- ============================================
+
+-- 🔄 RotatingBar
+GimmickRegistry:Register({
+    name = "RotatingBar",
+    displayName = "회전 막대",
+    icon = "🔄",
+    difficulty = "easy",
+    description = "회전하는 막대, 맞으면 튕겨남",
+    schema = {
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "위치 (Z)"},
+        width = {type = "number", min = 10, max = 50, default = 28, label = "너비"},
+        height = {type = "number", min = 1, max = 10, default = 3, label = "높이"},
+        speed = {type = "number", min = 0.5, max = 5, default = 1.5, label = "회전 속도"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableRotatingBars then return end
+        local bar = Instance.new("Part")
+        bar.Size = Vector3.new(data.width or 25, 2, 2)
+        bar.Position = Vector3.new(0, data.height or 3, data.z)
+        bar.Anchored = true
+        bar.BrickColor = BrickColor.new("Bright red")
+        bar.Material = Enum.Material.Metal
+        bar.Parent = parent
+        local actualSpeed = (data.speed or 2) * Config.ObstacleSpeed
+        table.insert(RotatingObjects, {
+            part = bar,
+            speed = actualSpeed,
+            rotation = math.random(0, 360),
+            rotationType = "Y"
+        })
+        local db = {}
+        bar.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player and not db[player] then
+                db[player] = true
+                local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+                if rp then
+                    Events.ItemEffect:FireClient(player, "Knockback", {direction = (rp.Position - bar.Position).Unit * 35 + Vector3.new(0, 18, 0)})
+                end
+                task.delay(0.5, function() db[player] = nil end)
+            end
+        end)
+        table.insert(ActiveGimmicks, bar)
+        return bar
+    end
+})
+
+-- 🔺 JumpPad
+GimmickRegistry:Register({
+    name = "JumpPad",
+    displayName = "점프 패드",
+    icon = "🔺",
+    difficulty = "easy",
+    description = "밟으면 높이 점프",
+    schema = {
+        x = {type = "number", min = -20, max = 20, default = 0, label = "X 위치"},
+        y = {type = "number", min = 0, max = 10, default = 0.5, label = "Y 위치"},
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "Z 위치"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableJumpPads then return end
+        local TW = Config.TRACK_WIDTH
+        local pos = Vector3.new(data.x or 0, data.y or 0.5, data.z)
+        local pad = Instance.new("Part")
+        pad.Name = "JumpPad"
+        pad.Size = Vector3.new(8, 1, 8)
+        pad.Position = pos
+        pad.Anchored = true
+        pad.BrickColor = BrickColor.new("Lime green")
+        pad.Material = Enum.Material.Neon
+        pad.Parent = parent
+        local springGui = Instance.new("SurfaceGui")
+        springGui.Face = Enum.NormalId.Top
+        springGui.Parent = pad
+        local springLabel = Instance.new("TextLabel")
+        springLabel.Size = UDim2.new(1, 0, 1, 0)
+        springLabel.BackgroundTransparency = 1
+        springLabel.Text = "🔺\n⬆️"
+        springLabel.TextColor3 = Color3.new(1, 1, 1)
+        springLabel.TextScaled = true
+        springLabel.Font = Enum.Font.GothamBold
+        springLabel.Parent = springGui
+        local wall = Instance.new("Part")
+        wall.Name = "JumpWall"
+        wall.Size = Vector3.new(TW, 12, 3)
+        wall.Position = Vector3.new(0, 6, pos.Z + 6)
+        wall.Anchored = true
+        wall.BrickColor = BrickColor.new("Medium stone grey")
+        wall.Material = Enum.Material.Brick
+        wall.Parent = parent
+        local wallGui = Instance.new("SurfaceGui")
+        wallGui.Face = Enum.NormalId.Back
+        wallGui.Parent = wall
+        local wallLabel = Instance.new("TextLabel")
+        wallLabel.Size = UDim2.new(1, 0, 1, 0)
+        wallLabel.BackgroundTransparency = 1
+        wallLabel.Text = "⬆️ JUMP! ⬆️"
+        wallLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        wallLabel.TextScaled = true
+        wallLabel.Font = Enum.Font.GothamBold
+        wallLabel.Parent = wallGui
+        local db = {}
+        pad.Touched:Connect(function(hit)
+            local hum = hit.Parent:FindFirstChild("Humanoid")
+            local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+            if hum and rp and not db[hit.Parent] then
+                db[hit.Parent] = true
+                local bv = Instance.new("BodyVelocity")
+                bv.MaxForce = Vector3.new(0, 100000, 0)
+                bv.Velocity = Vector3.new(0, 90, 0)
+                bv.Parent = rp
+                Debris:AddItem(bv, 0.2)
+                task.delay(0.5, function() db[hit.Parent] = nil end)
+            end
+        end)
+        table.insert(ActiveGimmicks, pad)
+        table.insert(ActiveGimmicks, wall)
+        return pad
+    end
+})
+
+-- 👻 SlimeZone
+GimmickRegistry:Register({
+    name = "SlimeZone",
+    displayName = "슬라임 구역",
+    icon = "👻",
+    difficulty = "easy",
+    description = "밟으면 느려지는 구역, 안전 경로 있음",
+    schema = {
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
+        length = {type = "number", min = 20, max = 200, default = 80, label = "길이"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableSlime then return end
+        local TW = Config.TRACK_WIDTH
+        local zStart = data.z
+        local length = data.length or 80
+        local slimeBase = Instance.new("Part")
+        slimeBase.Size = Vector3.new(TW, 0.5, length)
+        slimeBase.Position = Vector3.new(0, 0.25, zStart + length/2)
+        slimeBase.Anchored = true
+        slimeBase.BrickColor = BrickColor.new("Lime green")
+        slimeBase.Material = Enum.Material.Marble
+        slimeBase.Transparency = 0.3
+        slimeBase.Parent = parent
+        for i = 1, math.floor(length / 15) do
+            local ghostPart = Instance.new("Part")
+            ghostPart.Size = Vector3.new(6, 0.1, 6)
+            ghostPart.Position = Vector3.new(math.random(-10, 10), 0.35, zStart + i * 15)
+            ghostPart.Anchored = true
+            ghostPart.CanCollide = false
+            ghostPart.Transparency = 1
+            ghostPart.Parent = parent
+            local ghostGui = Instance.new("SurfaceGui")
+            ghostGui.Face = Enum.NormalId.Top
+            ghostGui.Parent = ghostPart
+            local ghostLabel = Instance.new("TextLabel")
+            ghostLabel.Size = UDim2.new(1, 0, 1, 0)
+            ghostLabel.BackgroundTransparency = 1
+            ghostLabel.Text = "👻"
+            ghostLabel.TextScaled = true
+            ghostLabel.Parent = ghostGui
+            table.insert(ActiveGimmicks, ghostPart)
+        end
+        local pathWidth = 6
+        local numPaths = math.floor(length / 20)
+        for i = 1, numPaths do
+            local xPos = (i % 2 == 0) and 10 or -10
+            local safePath = Instance.new("Part")
+            safePath.Name = "SafePath"
+            safePath.Size = Vector3.new(pathWidth, 0.6, 12)
+            safePath.Position = Vector3.new(xPos, 0.3, zStart + (i - 0.5) * (length / numPaths))
+            safePath.Anchored = true
+            safePath.BrickColor = BrickColor.new("Bright yellow")
+            safePath.Material = Enum.Material.Cobblestone
+            safePath.Parent = parent
+            table.insert(ActiveGimmicks, safePath)
+        end
+        local inSlime = {}
+        local safePaths = {}
+        for _, child in ipairs(parent:GetChildren()) do
+            if child.Name == "SafePath" then
+                child.Touched:Connect(function(hit)
+                    local char = hit.Parent
+                    if char:FindFirstChild("Humanoid") then
+                        safePaths[char] = true
+                    end
+                end)
+                child.TouchEnded:Connect(function(hit)
+                    local char = hit.Parent
+                    safePaths[char] = nil
+                end)
+            end
+        end
+        slimeBase.Touched:Connect(function(hit)
+            if not hit or not hit.Parent then return end
+            local hum = hit.Parent:FindFirstChild("Humanoid")
+            if hum and not inSlime[hit.Parent] and not safePaths[hit.Parent] then
+                inSlime[hit.Parent] = hum.WalkSpeed
+                hum.WalkSpeed = hum.WalkSpeed * Config.SlimeSlowFactor
+            end
+        end)
+        slimeBase.TouchEnded:Connect(function(hit)
+            if not hit or not hit.Parent then return end
+            local hum = hit.Parent:FindFirstChild("Humanoid")
+            if hum and inSlime[hit.Parent] then
+                hum.WalkSpeed = inSlime[hit.Parent]
+                inSlime[hit.Parent] = nil
+            end
+        end)
+        table.insert(ActiveGimmicks, slimeBase)
+        return slimeBase
+    end
+})
+
+-- 🥊 PunchingCorridor
+GimmickRegistry:Register({
+    name = "PunchingCorridor",
+    displayName = "펀칭 복도",
+    icon = "🥊",
+    difficulty = "medium",
+    description = "좁은 복도에서 글러브가 펀치",
+    schema = {
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
+        length = {type = "number", min = 50, max = 200, default = 100, label = "길이"}
+    },
+    builder = function(parent, data)
+        if not Config.EnablePunchingGloves then return end
+        local zStart = data.z
+        local length = data.length or 100
+        local corridorWidth = 12
+        local TW = Config.TRACK_WIDTH
+        for _, xOffset in ipairs({-corridorWidth/2 - 5, corridorWidth/2 + 5}) do
+            local wall = Instance.new("Part")
+            wall.Size = Vector3.new((TW - corridorWidth) / 2, 10, length)
+            wall.Position = Vector3.new((xOffset > 0) and (TW/4 + corridorWidth/4) or (-TW/4 - corridorWidth/4), 5, zStart + length/2)
+            wall.Anchored = true
+            wall.BrickColor = BrickColor.new("Dark stone grey")
+            wall.Material = Enum.Material.Brick
+            wall.Parent = parent
+            table.insert(ActiveGimmicks, wall)
+        end
+        local numGloves = math.floor(length / 25)
+        for i = 1, numGloves do
+            local zPos = zStart + i * (length / (numGloves + 1))
+            local side = (i % 2 == 0) and 1 or -1
+            local xPos = side * (corridorWidth/2 + 3)
+            local glove = Instance.new("Part")
+            glove.Name = "PunchingGlove"
+            glove.Size = Vector3.new(5, 5, 5)
+            glove.Position = Vector3.new(xPos, 4, zPos)
+            glove.Anchored = true
+            glove.BrickColor = BrickColor.new("Bright red")
+            glove.Material = Enum.Material.SmoothPlastic
+            glove.Parent = parent
+            local gloveGui = Instance.new("SurfaceGui")
+            gloveGui.Face = (side == 1) and Enum.NormalId.Left or Enum.NormalId.Right
+            gloveGui.Parent = glove
+            local gloveLabel = Instance.new("TextLabel")
+            gloveLabel.Size = UDim2.new(1, 0, 1, 0)
+            gloveLabel.BackgroundTransparency = 1
+            gloveLabel.Text = "🥊"
+            gloveLabel.TextScaled = true
+            gloveLabel.Parent = gloveGui
+            local gloveFrontGui = Instance.new("SurfaceGui")
+            gloveFrontGui.Face = Enum.NormalId.Front
+            gloveFrontGui.Parent = glove
+            local gloveFrontLabel = Instance.new("TextLabel")
+            gloveFrontLabel.Size = UDim2.new(1, 0, 1, 0)
+            gloveFrontLabel.BackgroundTransparency = 1
+            gloveFrontLabel.Text = "🥊"
+            gloveFrontLabel.TextScaled = true
+            gloveFrontLabel.Parent = gloveFrontGui
+            local retracted = Vector3.new(xPos, 4, zPos)
+            local extended = Vector3.new(-side * (corridorWidth/2 - 2), 4, zPos)
+            task.spawn(function()
+                task.wait(i * 0.3)
+                while glove and glove.Parent do
+                    task.wait(2 / Config.ObstacleSpeed)
+                    glove.BrickColor = BrickColor.new("Really red")
+                    task.wait(0.3)
+                    TweenService:Create(glove, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Position = extended}):Play()
+                    task.wait(0.2)
+                    TweenService:Create(glove, TweenInfo.new(0.4), {Position = retracted}):Play()
+                    glove.BrickColor = BrickColor.new("Bright red")
+                    task.wait(0.4)
+                end
+            end)
+            local db = {}
+            glove.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                local hum = hit.Parent:FindFirstChild("Humanoid")
+                if player and hum and not db[player] then
+                    db[player] = true
+                    local origSpeed = hum.WalkSpeed
+                    local origJump = hum.JumpPower
+                    hum.WalkSpeed = origSpeed * 0.3
+                    hum.JumpPower = 0
+                    Events.ItemEffect:FireClient(player, "PunchStun", {duration = 1.5})
+                    task.delay(1.5, function()
+                        if hum then
+                            hum.WalkSpeed = origSpeed
+                            hum.JumpPower = origJump
+                        end
+                        db[player] = nil
+                    end)
+                end
+            end)
+            table.insert(ActiveGimmicks, glove)
+        end
+    end
+})
+
+-- 🚪 QuizGate
+GimmickRegistry:Register({
+    name = "QuizGate",
+    displayName = "퀴즈 게이트",
+    icon = "🚪",
+    difficulty = "medium",
+    description = "퀴즈 정답 문으로 통과",
+    schema = {
+        id = {type = "number", min = 1, max = 100, default = 1, label = "게이트 ID"},
+        triggerZ = {type = "number", min = 0, max = 2000, default = 150, label = "트리거 위치"},
+        gateZ = {type = "number", min = 0, max = 2000, default = 180, label = "게이트 위치"},
+        options = {type = "number", min = 2, max = 4, default = 2, label = "선택지 수"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableQuizGates then return end
+        local gateId = data.id
+        local triggerZ = data.triggerZ
+        local gateZ = data.gateZ
+        local optionCount = data.options or 2
+        local quiz = GetQuizByOptionCount(optionCount)
+        local TW = Config.TRACK_WIDTH
+        local trigger = Instance.new("Part")
+        trigger.Size = Vector3.new(TW, 10, 5)
+        trigger.Position = Vector3.new(0, 5, triggerZ)
+        trigger.Anchored = true
+        trigger.CanCollide = false
+        trigger.Transparency = 1
+        trigger.Parent = parent
+        local triggerFloor = Instance.new("Part")
+        triggerFloor.Size = Vector3.new(TW, 0.5, 5)
+        triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
+        triggerFloor.Anchored = true
+        triggerFloor.CanCollide = false
+        triggerFloor.BrickColor = BrickColor.new("Bright violet")
+        triggerFloor.Material = Enum.Material.Neon
+        triggerFloor.Transparency = 0.5
+        triggerFloor.Parent = parent
+        local gateWidth = TW / optionCount
+        for i = 1, optionCount do
+            local xPos = -TW/2 + gateWidth/2 + (i-1) * gateWidth
+            local gate = Instance.new("Part")
+            gate.Name = "Gate" .. gateId .. "_" .. i
+            gate.Size = Vector3.new(gateWidth - 1, 14, 3)
+            gate.Position = Vector3.new(xPos, 7, gateZ)
+            gate.Anchored = true
+            gate.CanCollide = false
+            gate.Color = gateColors[i]
+            gate.Material = Enum.Material.Neon
+            gate.Transparency = 0.2
+            gate.Parent = parent
+            local outline = Instance.new("SelectionBox")
+            outline.Adornee = gate
+            outline.Color3 = gateColors[i]
+            outline.LineThickness = 0.05
+            outline.Parent = gate
+            local gui = Instance.new("SurfaceGui")
+            gui.Face = Enum.NormalId.Back
+            gui.Parent = gate
+            local num = Instance.new("TextLabel")
+            num.Size = UDim2.new(1,0,0.35,0)
+            num.BackgroundTransparency = 1
+            num.Text = "[" .. i .. "]"
+            num.TextColor3 = Color3.new(1,1,1)
+            num.TextScaled = true
+            num.Font = Enum.Font.GothamBold
+            num.Parent = gui
+            local opt = Instance.new("TextLabel")
+            opt.Size = UDim2.new(0.9,0,0.55,0)
+            opt.Position = UDim2.new(0.05,0,0.4,0)
+            opt.BackgroundTransparency = 1
+            opt.Text = quiz.o[i]
+            opt.TextColor3 = Color3.new(1,1,1)
+            opt.TextScaled = true
+            opt.Font = Enum.Font.GothamBold
+            opt.Parent = gui
+            local db = {}
+            gate.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                if not player or db[player] then return end
+                local answer = PlayerGateAnswers[player] and PlayerGateAnswers[player][gateId]
+                if answer == i then
+                    Events.ItemEffect:FireClient(player, "GateCorrect", {})
+                    AwardXP(player, XPRewards.QuizCorrect, "Quiz Correct!")
+                else
+                    db[player] = true
+                    local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+                    local hum = hit.Parent:FindFirstChild("Humanoid")
+                    if hum and rp then
+                        local origSpeed = hum.WalkSpeed
+                        local origJump = hum.JumpPower
+                        hum.WalkSpeed = 0
+                        hum.JumpPower = 0
+                        local bv = Instance.new("BodyVelocity")
+                        bv.MaxForce = Vector3.new(50000,50000,50000)
+                        bv.Velocity = Vector3.new(0, 22, -50)
+                        bv.Parent = rp
+                        Debris:AddItem(bv, 0.3)
+                        Events.ItemEffect:FireClient(player, "GateWrong", {duration = 1.2})
+                        task.delay(1.2, function()
+                            if hum then hum.WalkSpeed = origSpeed; hum.JumpPower = origJump end
+                            db[player] = nil
+                        end)
+                    end
+                end
+            end)
+            table.insert(ActiveGimmicks, gate)
+        end
+        local triggered = {}
+        trigger.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if not player or triggered[player] then return end
+            triggered[player] = true
+            if not PlayerGateAnswers[player] then PlayerGateAnswers[player] = {} end
+            PlayerGateAnswers[player][gateId] = quiz.a
+            Events.GateQuiz:FireClient(player, {
+                gateId = gateId,
+                question = quiz.q,
+                options = quiz.o,
+                optionCount = optionCount,
+                colors = gateColors
+            })
+            task.delay(20, function() triggered[player] = nil end)
+        end)
+        table.insert(ActiveGimmicks, trigger)
+    end
+})
+
+-- 🛗 Elevator
+GimmickRegistry:Register({
+    name = "Elevator",
+    displayName = "엘리베이터 퀴즈",
+    icon = "🛗",
+    difficulty = "hard",
+    description = "정답 플랫폼이 빨리 올라감",
+    schema = {
+        id = {type = "number", min = 1, max = 100, default = 1, label = "엘리베이터 ID"},
+        triggerZ = {type = "number", min = 0, max = 2000, default = 620, label = "트리거 위치"},
+        elevZ = {type = "number", min = 0, max = 2000, default = 670, label = "엘리베이터 위치"},
+        options = {type = "number", min = 2, max = 4, default = 3, label = "선택지 수"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableElevators then return end
+        local elevId = data.id
+        local triggerZ = data.triggerZ
+        local elevZ = data.elevZ
+        local optionCount = data.options or 3
+        local quiz = GetQuizByOptionCount(optionCount)
+        local TW = Config.TRACK_WIDTH
+        local platformLength = 22
+        local elevationHeight = 15
+        local startY = 1
+        local hole = Instance.new("Part")
+        hole.Size = Vector3.new(TW, 1, platformLength + 4)
+        hole.Position = Vector3.new(0, -0.5, elevZ)
+        hole.Anchored = true
+        hole.CanCollide = false
+        hole.BrickColor = BrickColor.new("Really black")
+        hole.Parent = parent
+        local trigger = Instance.new("Part")
+        trigger.Size = Vector3.new(TW, 10, 5)
+        trigger.Position = Vector3.new(0, 5, triggerZ)
+        trigger.Anchored = true
+        trigger.CanCollide = false
+        trigger.Transparency = 1
+        trigger.Parent = parent
+        local triggerFloor = Instance.new("Part")
+        triggerFloor.Size = Vector3.new(TW, 0.5, 5)
+        triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
+        triggerFloor.Anchored = true
+        triggerFloor.CanCollide = false
+        triggerFloor.BrickColor = BrickColor.new("Cyan")
+        triggerFloor.Material = Enum.Material.Neon
+        triggerFloor.Transparency = 0.5
+        triggerFloor.Parent = parent
+        local platWidth = TW / optionCount
+        local platforms = {}
+        for i = 1, optionCount do
+            local xPos = -TW/2 + platWidth/2 + (i-1) * platWidth
+            local plat = Instance.new("Part")
+            plat.Size = Vector3.new(platWidth - 1, 4, platformLength)
+            plat.Position = Vector3.new(xPos, startY, elevZ)
+            plat.Anchored = true
+            plat.BrickColor = BrickColor.new("Medium stone grey")
+            plat.Material = Enum.Material.Concrete
+            plat.Parent = parent
+            local colorTop = Instance.new("Part")
+            colorTop.Size = Vector3.new(platWidth - 1, 0.5, platformLength)
+            colorTop.Position = Vector3.new(xPos, startY + 2.25, elevZ)
+            colorTop.Anchored = true
+            colorTop.Color = gateColors[i]
+            colorTop.Material = Enum.Material.Neon
+            colorTop.Parent = parent
+            local numPart = Instance.new("Part")
+            numPart.Size = Vector3.new(platWidth - 2, 5, 1)
+            numPart.Position = Vector3.new(xPos, startY + 5, elevZ - platformLength/2 + 1)
+            numPart.Anchored = true
+            numPart.CanCollide = false
+            numPart.Transparency = 1
+            numPart.Parent = parent
+            local gui = Instance.new("SurfaceGui")
+            gui.Face = Enum.NormalId.Front
+            gui.Parent = numPart
+            local num = Instance.new("TextLabel")
+            num.Size = UDim2.new(1,0,0.5,0)
+            num.BackgroundTransparency = 1
+            num.Text = "[" .. i .. "]"
+            num.TextColor3 = Color3.new(1,1,1)
+            num.TextScaled = true
+            num.Font = Enum.Font.GothamBold
+            num.Parent = gui
+            local opt = Instance.new("TextLabel")
+            opt.Size = UDim2.new(1,0,0.5,0)
+            opt.Position = UDim2.new(0,0,0.5,0)
+            opt.BackgroundTransparency = 1
+            opt.Text = quiz.o[i]
+            opt.TextColor3 = Color3.new(1,1,1)
+            opt.TextScaled = true
+            opt.Font = Enum.Font.GothamBold
+            opt.Parent = gui
+            platforms[i] = {
+                plat = plat,
+                colorTop = colorTop,
+                numPart = numPart,
+                correct = (i == quiz.a),
+                startY = startY,
+                targetY = elevationHeight + startY
+            }
+            local platDb = {}
+            plat.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                if not player or platDb[player] then return end
+                platDb[player] = true
+                if i == quiz.a then
+                    Events.ItemEffect:FireClient(player, "GateCorrect", {})
+                    AwardXP(player, XPRewards.QuizCorrect, "Elevator Correct!")
+                else
+                    Events.ItemEffect:FireClient(player, "GateWrong", {})
+                end
+                task.delay(3, function() platDb[player] = nil end)
+            end)
+            table.insert(ActiveGimmicks, plat)
+        end
+        local upperFloorY = elevationHeight + startY + 1
+        local upperFloor = Instance.new("Part")
+        upperFloor.Size = Vector3.new(TW, 3, platformLength + 10)
+        upperFloor.Position = Vector3.new(0, upperFloorY, elevZ + platformLength)
+        upperFloor.Anchored = true
+        upperFloor.BrickColor = BrickColor.new("Brick yellow")
+        upperFloor.Material = Enum.Material.Cobblestone
+        upperFloor.Parent = parent
+        local bridge = Instance.new("Part")
+        bridge.Size = Vector3.new(TW, 1, 5)
+        bridge.Position = Vector3.new(0, upperFloorY - 1, elevZ + platformLength/2 + 2)
+        bridge.Anchored = true
+        bridge.BrickColor = BrickColor.new("Brick yellow")
+        bridge.Material = Enum.Material.Cobblestone
+        bridge.Parent = parent
+        local underFloor = Instance.new("Part")
+        underFloor.Size = Vector3.new(TW + 10, 10, 100)
+        underFloor.Position = Vector3.new(0, -10, elevZ + platformLength + 30)
+        underFloor.Anchored = true
+        underFloor.BrickColor = BrickColor.new("Dark stone grey")
+        underFloor.Material = Enum.Material.Brick
+        underFloor.Parent = parent
+        local ramp = Instance.new("Part")
+        ramp.Size = Vector3.new(TW, 3, 50)
+        local rampZ = elevZ + platformLength + platformLength/2 + 30
+        ramp.Position = Vector3.new(0, upperFloorY/2, rampZ)
+        ramp.Anchored = true
+        ramp.BrickColor = BrickColor.new("Brick yellow")
+        ramp.Material = Enum.Material.Cobblestone
+        ramp.CFrame = CFrame.new(ramp.Position) * CFrame.Angles(math.rad(18), 0, 0)
+        ramp.Parent = parent
+        local rampSupport = Instance.new("Part")
+        rampSupport.Size = Vector3.new(TW, upperFloorY, 50)
+        rampSupport.Position = Vector3.new(0, -3, rampZ)
+        rampSupport.Anchored = true
+        rampSupport.BrickColor = BrickColor.new("Dark stone grey")
+        rampSupport.Material = Enum.Material.Brick
+        rampSupport.Parent = parent
+        local triggered = {}
+        trigger.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if not player or triggered[player] then return end
+            triggered[player] = true
+            Events.GateQuiz:FireClient(player, {
+                gateId = "elev" .. elevId,
+                question = quiz.q,
+                options = quiz.o,
+                optionCount = optionCount,
+                isElevator = true,
+                colors = gateColors
+            })
+            task.delay(5, function()
+                for i, p in ipairs(platforms) do
+                    local riseTime = p.correct and 1.5 or 4
+                    local targetY = p.targetY
+                    TweenService:Create(p.plat, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
+                        Position = Vector3.new(p.plat.Position.X, targetY, p.plat.Position.Z)
+                    }):Play()
+                    TweenService:Create(p.colorTop, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
+                        Position = Vector3.new(p.colorTop.Position.X, targetY + 2.25, p.colorTop.Position.Z)
+                    }):Play()
+                    TweenService:Create(p.numPart, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
+                        Position = Vector3.new(p.numPart.Position.X, targetY + 5, p.numPart.Position.Z)
+                    }):Play()
+                end
+            end)
+            task.delay(25, function()
+                for _, p in ipairs(platforms) do
+                    TweenService:Create(p.plat, TweenInfo.new(2), {Position = Vector3.new(p.plat.Position.X, p.startY, p.plat.Position.Z)}):Play()
+                    TweenService:Create(p.colorTop, TweenInfo.new(2), {Position = Vector3.new(p.colorTop.Position.X, p.startY + 2.25, p.colorTop.Position.Z)}):Play()
+                    TweenService:Create(p.numPart, TweenInfo.new(2), {Position = Vector3.new(p.numPart.Position.X, p.startY + 5, p.numPart.Position.Z)}):Play()
+                end
+                triggered[player] = nil
+            end)
+        end)
+        table.insert(ActiveGimmicks, trigger)
+        table.insert(ActiveGimmicks, upperFloor)
+        table.insert(ActiveGimmicks, underFloor)
+        table.insert(ActiveGimmicks, ramp)
+        table.insert(ActiveGimmicks, rampSupport)
+    end
+})
+
+-- ⬅️ ConveyorBelt
+GimmickRegistry:Register({
+    name = "ConveyorBelt",
+    displayName = "컨베이어 벨트",
+    icon = "⬅️",
+    difficulty = "medium",
+    description = "뒤로 밀리는 바닥",
+    schema = {
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
+        length = {type = "number", min = 20, max = 200, default = 60, label = "길이"},
+        direction = {type = "number", min = -1, max = 1, default = -1, label = "방향 (-1: 뒤로)"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableConveyorBelt then return end
+        local zStart = data.z
+        local length = data.length or 60
+        local direction = data.direction or -1
+        local TW = Config.TRACK_WIDTH
+        local belt = Instance.new("Part")
+        belt.Size = Vector3.new(TW - 4, 1, length)
+        belt.Position = Vector3.new(0, 0.5, zStart + length/2)
+        belt.Anchored = true
+        belt.BrickColor = BrickColor.new("Dark stone grey")
+        belt.Material = Enum.Material.DiamondPlate
+        belt.Parent = parent
+        local signPart = Instance.new("Part")
+        signPart.Size = Vector3.new(10, 5, 1)
+        signPart.Position = Vector3.new(0, 5, zStart - 3)
+        signPart.Anchored = true
+        signPart.CanCollide = false
+        signPart.Transparency = 0.5
+        signPart.BrickColor = BrickColor.new("Bright yellow")
+        signPart.Parent = parent
+        local signGui = Instance.new("SurfaceGui")
+        signGui.Face = Enum.NormalId.Front
+        signGui.Parent = signPart
+        local signLabel = Instance.new("TextLabel")
+        signLabel.Size = UDim2.new(1, 0, 1, 0)
+        signLabel.BackgroundTransparency = 1
+        signLabel.Text = "⬅️ CONVEYOR"
+        signLabel.TextColor3 = Color3.new(0, 0, 0)
+        signLabel.TextScaled = true
+        signLabel.Font = Enum.Font.GothamBold
+        signLabel.Parent = signGui
+        local playersOnBelt = {}
+        belt.Touched:Connect(function(hit)
+            local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+            if rp then playersOnBelt[hit.Parent] = true end
+        end)
+        belt.TouchEnded:Connect(function(hit) playersOnBelt[hit.Parent] = nil end)
+        task.spawn(function()
+            while belt and belt.Parent do
+                for char, _ in pairs(playersOnBelt) do
+                    local rp = char:FindFirstChild("HumanoidRootPart")
+                    if rp then rp.CFrame = rp.CFrame + Vector3.new(0, 0, direction * 0.02) end
+                end
+                task.wait()
+            end
+        end)
+        table.insert(ActiveGimmicks, belt)
+        table.insert(ActiveGimmicks, signPart)
+        return belt
+    end
+})
+
+-- ⚡ ElectricFloor
+GimmickRegistry:Register({
+    name = "ElectricFloor",
+    displayName = "전기 바닥",
+    icon = "⚡",
+    difficulty = "medium",
+    description = "주기적으로 감전되는 바닥",
+    schema = {
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
+        length = {type = "number", min = 20, max = 200, default = 60, label = "길이"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableElectricFloor then return end
+        local zStart = data.z
+        local length = data.length or 60
+        local TW = Config.TRACK_WIDTH
+        local floor = Instance.new("Part")
+        floor.Name = "ElectricFloor"
+        floor.Size = Vector3.new(TW - 4, 0.5, length + 20)
+        floor.Position = Vector3.new(0, 0.25, zStart + length/2)
+        floor.Anchored = true
+        floor.BrickColor = BrickColor.new("Medium stone grey")
+        floor.Material = Enum.Material.Metal
+        floor.Parent = parent
+        for i = 1, math.floor(length / 12) do
+            local boltPart = Instance.new("Part")
+            boltPart.Size = Vector3.new(5, 0.1, 5)
+            boltPart.Position = Vector3.new(math.random(-12, 12), 0.35, zStart + i * 12)
+            boltPart.Anchored = true
+            boltPart.CanCollide = false
+            boltPart.Transparency = 1
+            boltPart.Parent = parent
+            local boltGui = Instance.new("SurfaceGui")
+            boltGui.Face = Enum.NormalId.Top
+            boltGui.Parent = boltPart
+            local boltLabel = Instance.new("TextLabel")
+            boltLabel.Size = UDim2.new(1, 0, 1, 0)
+            boltLabel.BackgroundTransparency = 1
+            boltLabel.Text = "⚡"
+            boltLabel.TextScaled = true
+            boltLabel.Parent = boltGui
+            table.insert(ActiveGimmicks, boltPart)
+        end
+        local warnSign = Instance.new("Part")
+        warnSign.Size = Vector3.new(12, 6, 1)
+        warnSign.Position = Vector3.new(0, 5, zStart - 5)
+        warnSign.Anchored = true
+        warnSign.CanCollide = false
+        warnSign.BrickColor = BrickColor.new("Bright yellow")
+        warnSign.Parent = parent
+        local warnGui = Instance.new("SurfaceGui")
+        warnGui.Face = Enum.NormalId.Front
+        warnGui.Parent = warnSign
+        local warnLabel = Instance.new("TextLabel")
+        warnLabel.Size = UDim2.new(1, 0, 1, 0)
+        warnLabel.BackgroundTransparency = 1
+        warnLabel.Text = "⚡ DANGER ⚡"
+        warnLabel.TextColor3 = Color3.new(0, 0, 0)
+        warnLabel.TextScaled = true
+        warnLabel.Font = Enum.Font.GothamBold
+        warnLabel.Parent = warnGui
+        local playersOnFloor = {}
+        floor.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player then playersOnFloor[player] = true end
+        end)
+        floor.TouchEnded:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player then playersOnFloor[player] = nil end
+        end)
+        task.spawn(function()
+            while floor and floor.Parent do
+                floor.BrickColor = BrickColor.new("Bright yellow")
+                floor.Material = Enum.Material.Metal
+                task.wait(1.5)
+                floor.BrickColor = BrickColor.new("Cyan")
+                floor.Material = Enum.Material.Neon
+                for player, _ in pairs(playersOnFloor) do
+                    Events.ItemEffect:FireClient(player, "Electrocuted", {duration = 0.8})
+                end
+                task.wait(0.6)
+                floor.BrickColor = BrickColor.new("Medium stone grey")
+                floor.Material = Enum.Material.Metal
+                task.wait(2)
+            end
+        end)
+        table.insert(ActiveGimmicks, floor)
+        table.insert(ActiveGimmicks, warnSign)
+        return floor
+    end
+})
+
+-- 🪨 RollingBoulder
+GimmickRegistry:Register({
+    name = "RollingBoulder",
+    displayName = "굴러오는 바위",
+    icon = "🪨",
+    difficulty = "hard",
+    description = "뒤에서 굴러오는 바위",
+    schema = {
+        zStart = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
+        zEnd = {type = "number", min = 0, max = 2000, default = 200, label = "끝 위치 (Z)"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableRollingBoulder then return end
+        local zStart = data.zStart
+        local zEnd = data.zEnd
+        local warnSign = Instance.new("Part")
+        warnSign.Size = Vector3.new(12, 8, 1)
+        warnSign.Position = Vector3.new(0, 6, zStart - 15)
+        warnSign.Anchored = true
+        warnSign.CanCollide = false
+        warnSign.BrickColor = BrickColor.new("Bright red")
+        warnSign.Parent = parent
+        local warnGui = Instance.new("SurfaceGui")
+        warnGui.Face = Enum.NormalId.Front
+        warnGui.Parent = warnSign
+        local warnLabel = Instance.new("TextLabel")
+        warnLabel.Size = UDim2.new(1,0,1,0)
+        warnLabel.BackgroundTransparency = 1
+        warnLabel.Text = "⚠️ BOULDER! ⚠️\n🪨 DODGE! 🪨"
+        warnLabel.TextColor3 = Color3.new(1,1,1)
+        warnLabel.TextScaled = true
+        warnLabel.Font = Enum.Font.GothamBold
+        warnLabel.Parent = warnGui
+        task.spawn(function()
+            while parent and parent.Parent do
+                task.wait(7 / Config.ObstacleSpeed)
+                local boulder = Instance.new("Part")
+                boulder.Size = Vector3.new(10, 10, 10)
+                boulder.Position = Vector3.new(0, 6, zEnd + 5)
+                boulder.Anchored = false
+                boulder.Shape = Enum.PartType.Ball
+                boulder.BrickColor = BrickColor.new("Dark stone grey")
+                boulder.Material = Enum.Material.Slate
+                boulder.Parent = parent
+                local bv = Instance.new("BodyVelocity")
+                bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                bv.Velocity = Vector3.new(0, 0, -45 * Config.ObstacleSpeed)
+                bv.Parent = boulder
+                local db = {}
+                boulder.Touched:Connect(function(hit)
+                    local player = Players:GetPlayerFromCharacter(hit.Parent)
+                    if player and not db[player] then
+                        db[player] = true
+                        Events.ItemEffect:FireClient(player, "BoulderHit", {direction = Vector3.new(0, 35, -55)})
+                        task.delay(1, function() db[player] = nil end)
+                    end
+                end)
+                task.delay(12, function() if boulder and boulder.Parent then boulder:Destroy() end end)
+            end
+        end)
+        table.insert(ActiveGimmicks, warnSign)
+        return warnSign
+    end
+})
+
+-- ⏰ DisappearingBridge
+GimmickRegistry:Register({
+    name = "DisappearingBridge",
+    displayName = "사라지는 다리",
+    icon = "⏰",
+    difficulty = "hard",
+    description = "밟으면 사라지는 플랫폼",
+    schema = {
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
+        platformCount = {type = "number", min = 2, max = 20, default = 6, label = "플랫폼 수"}
+    },
+    builder = function(parent, data)
+        if not Config.EnableDisappearingBridge then return end
+        local zStart = data.z
+        local platformCount = data.platformCount or 6
+        local platformWidth = 10
+        local gap = 6
+        local TW = Config.TRACK_WIDTH
+        local lava = Instance.new("Part")
+        lava.Size = Vector3.new(TW, 1, platformCount * (platformWidth + gap) + 20)
+        lava.Position = Vector3.new(0, -15, zStart + platformCount * (platformWidth + gap) / 2)
+        lava.Anchored = true
+        lava.CanCollide = false
+        lava.BrickColor = BrickColor.new("Bright orange")
+        lava.Material = Enum.Material.Neon
+        lava.Parent = parent
+        local lavaTop = Instance.new("Part")
+        lavaTop.Size = Vector3.new(TW - 2, 0.5, platformCount * (platformWidth + gap) + 18)
+        lavaTop.Position = Vector3.new(0, -14.5, zStart + platformCount * (platformWidth + gap) / 2)
+        lavaTop.Anchored = true
+        lavaTop.CanCollide = false
+        lavaTop.BrickColor = BrickColor.new("Bright red")
+        lavaTop.Material = Enum.Material.Neon
+        lavaTop.Transparency = 0.3
+        lavaTop.Parent = parent
+        lava.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player then Events.ItemEffect:FireClient(player, "LavaFall", {}) end
+        end)
+        local warnSign = Instance.new("Part")
+        warnSign.Size = Vector3.new(14, 7, 1)
+        warnSign.Position = Vector3.new(0, 6, zStart - 8)
+        warnSign.Anchored = true
+        warnSign.CanCollide = false
+        warnSign.BrickColor = BrickColor.new("Bright orange")
+        warnSign.Parent = parent
+        local warnGui = Instance.new("SurfaceGui")
+        warnGui.Face = Enum.NormalId.Front
+        warnGui.Parent = warnSign
+        local warnLabel = Instance.new("TextLabel")
+        warnLabel.Size = UDim2.new(1, 0, 1, 0)
+        warnLabel.BackgroundTransparency = 1
+        warnLabel.Text = "⏰ DISAPPEARING!\n🔥 DON'T STOP! 🔥"
+        warnLabel.TextColor3 = Color3.new(1, 1, 1)
+        warnLabel.TextScaled = true
+        warnLabel.Font = Enum.Font.GothamBold
+        warnLabel.Parent = warnGui
+        for i = 1, platformCount do
+            local z = zStart + (i - 1) * (platformWidth + gap)
+            local xOffset = (i % 2 == 0) and -8 or 8
+            local platform = Instance.new("Part")
+            platform.Name = "DisappearingPlatform"
+            platform.Size = Vector3.new(14, 2, platformWidth)
+            platform.Position = Vector3.new(xOffset, 1, z)
+            platform.Anchored = true
+            platform.BrickColor = BrickColor.new("Bright orange")
+            platform.Material = Enum.Material.Wood
+            platform.Parent = parent
+            local clockGui = Instance.new("SurfaceGui")
+            clockGui.Face = Enum.NormalId.Top
+            clockGui.Parent = platform
+            local clockLabel = Instance.new("TextLabel")
+            clockLabel.Size = UDim2.new(1, 0, 1, 0)
+            clockLabel.BackgroundTransparency = 1
+            clockLabel.Text = "⏰"
+            clockLabel.TextScaled = true
+            clockLabel.Parent = clockGui
+            local db = {}
+            platform.Touched:Connect(function(hit)
+                local hum = hit.Parent:FindFirstChild("Humanoid")
+                if hum and not db[platform] then
+                    db[platform] = true
+                    TweenService:Create(platform, TweenInfo.new(0.2), {Color = Color3.fromRGB(255, 0, 0)}):Play()
+                    clockLabel.Text = "⏰❗"
+                    task.delay(1.2, function()
+                        platform.CanCollide = false
+                        TweenService:Create(platform, TweenInfo.new(0.3), {
+                            Transparency = 1,
+                            Position = platform.Position + Vector3.new(0, -2, 0)
+                        }):Play()
+                        task.delay(3, function()
+                            platform.Position = Vector3.new(xOffset, 1, z)
+                            platform.CanCollide = true
+                            platform.BrickColor = BrickColor.new("Bright orange")
+                            clockLabel.Text = "⏰"
+                            TweenService:Create(platform, TweenInfo.new(0.3), {Transparency = 0}):Play()
+                            db[platform] = nil
+                        end)
+                    end)
+                end
+            end)
+            table.insert(ActiveGimmicks, platform)
+        end
+        table.insert(ActiveGimmicks, lava)
+        table.insert(ActiveGimmicks, lavaTop)
+        table.insert(ActiveGimmicks, warnSign)
+        return lava
+    end
+})
+
+print("✅ GimmickRegistry: 10 gimmicks registered")
 
 -- ============================================
 -- 🏰 CREATE CASTLE EXTERIOR
@@ -623,1005 +1641,118 @@ local function CreateRaceTrack(parent)
     print("  ✅ Race Track Complete!")
     return trackFolder
 end
-
 -- ============================================
--- 🎮 GIMMICK BUILDERS
+-- 🏗️ COURSE ENGINE
 -- ============================================
+local CourseEngine = {}
 
-local function CreateRotatingBar(parent, zPos, width, height, speed)
-    if not Config.EnableRotatingBars then return end
+function CourseEngine:BuildFromData(parent, courseData)
+    print(string.format("🏗️ Building course: %s by %s",
+        courseData.metadata.name,
+        courseData.metadata.author))
 
-    local bar = Instance.new("Part")
-    bar.Size = Vector3.new(width or 25, 2, 2)
-    bar.Position = Vector3.new(0, height or 3, zPos)
-    bar.Anchored = true
-    bar.BrickColor = BrickColor.new("Bright red")
-    bar.Material = Enum.Material.Metal
-    bar.Parent = parent
+    local builtCount = 0
+    local errorCount = 0
 
-    local actualSpeed = (speed or 2) * Config.ObstacleSpeed
-
-    -- 🔄 PERFORMANCE: 개별 루프 대신 중앙 관리 테이블에 등록
-    table.insert(RotatingObjects, {
-        part = bar,
-        speed = actualSpeed,
-        rotation = math.random(0, 360),
-        rotationType = "Y"  -- Y축 회전
-    })
-
-    local db = {}
-    bar.Touched:Connect(function(hit)
-        local player = Players:GetPlayerFromCharacter(hit.Parent)
-        if player and not db[player] then
-            db[player] = true
-            local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-            if rp then
-                Events.ItemEffect:FireClient(player, "Knockback", {direction = (rp.Position - bar.Position).Unit * 35 + Vector3.new(0, 18, 0)})
-            end
-            task.delay(0.5, function() db[player] = nil end)
-        end
-    end)
-
-    table.insert(ActiveGimmicks, bar)
-end
-
-local function CreateJumpPad(parent, pos)
-    if not Config.EnableJumpPads then return end
-    
-    local TW = Config.TRACK_WIDTH
-    
-    local pad = Instance.new("Part")
-    pad.Name = "JumpPad"
-    pad.Size = Vector3.new(8, 1, 8)
-    pad.Position = pos
-    pad.Anchored = true
-    pad.BrickColor = BrickColor.new("Lime green")
-    pad.Material = Enum.Material.Neon
-    pad.Parent = parent
-    
-    local springGui = Instance.new("SurfaceGui")
-    springGui.Face = Enum.NormalId.Top
-    springGui.Parent = pad
-    
-    local springLabel = Instance.new("TextLabel")
-    springLabel.Size = UDim2.new(1, 0, 1, 0)
-    springLabel.BackgroundTransparency = 1
-    springLabel.Text = "🔺\n⬆️"
-    springLabel.TextColor3 = Color3.new(1, 1, 1)
-    springLabel.TextScaled = true
-    springLabel.Font = Enum.Font.GothamBold
-    springLabel.Parent = springGui
-    
-    local wall = Instance.new("Part")
-    wall.Name = "JumpWall"
-    wall.Size = Vector3.new(TW, 12, 3)
-    wall.Position = Vector3.new(0, 6, pos.Z + 6)
-    wall.Anchored = true
-    wall.BrickColor = BrickColor.new("Medium stone grey")
-    wall.Material = Enum.Material.Brick
-    wall.Parent = parent
-    
-    local wallGui = Instance.new("SurfaceGui")
-    wallGui.Face = Enum.NormalId.Back
-    wallGui.Parent = wall
-    
-    local wallLabel = Instance.new("TextLabel")
-    wallLabel.Size = UDim2.new(1, 0, 1, 0)
-    wallLabel.BackgroundTransparency = 1
-    wallLabel.Text = "⬆️ JUMP! ⬆️"
-    wallLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    wallLabel.TextScaled = true
-    wallLabel.Font = Enum.Font.GothamBold
-    wallLabel.Parent = wallGui
-    
-    local db = {}
-    pad.Touched:Connect(function(hit)
-        local hum = hit.Parent:FindFirstChild("Humanoid")
-        local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-        if hum and rp and not db[hit.Parent] then
-            db[hit.Parent] = true
-            local bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(0, 100000, 0)
-            bv.Velocity = Vector3.new(0, 90, 0)
-            bv.Parent = rp
-            Debris:AddItem(bv, 0.2)
-            task.delay(0.5, function() db[hit.Parent] = nil end)
-        end
-    end)
-    
-    table.insert(ActiveGimmicks, pad)
-    table.insert(ActiveGimmicks, wall)
-end
-
-local function CreateSlimeZone(parent, zStart, length)
-    if not Config.EnableSlime then return end
-    
-    local TW = Config.TRACK_WIDTH
-    
-    local slimeBase = Instance.new("Part")
-    slimeBase.Size = Vector3.new(TW, 0.5, length)
-    slimeBase.Position = Vector3.new(0, 0.25, zStart + length/2)
-    slimeBase.Anchored = true
-    slimeBase.BrickColor = BrickColor.new("Lime green")
-    slimeBase.Material = Enum.Material.Marble
-    slimeBase.Transparency = 0.3
-    slimeBase.Parent = parent
-    
-    for i = 1, math.floor(length / 15) do
-        local ghostPart = Instance.new("Part")
-        ghostPart.Size = Vector3.new(6, 0.1, 6)
-        ghostPart.Position = Vector3.new(math.random(-10, 10), 0.35, zStart + i * 15)
-        ghostPart.Anchored = true
-        ghostPart.CanCollide = false
-        ghostPart.Transparency = 1
-        ghostPart.Parent = parent
-        
-        local ghostGui = Instance.new("SurfaceGui")
-        ghostGui.Face = Enum.NormalId.Top
-        ghostGui.Parent = ghostPart
-        
-        local ghostLabel = Instance.new("TextLabel")
-        ghostLabel.Size = UDim2.new(1, 0, 1, 0)
-        ghostLabel.BackgroundTransparency = 1
-        ghostLabel.Text = "👻"
-        ghostLabel.TextScaled = true
-        ghostLabel.Parent = ghostGui
-        
-        table.insert(ActiveGimmicks, ghostPart)
-    end
-    
-    local pathWidth = 6
-    local numPaths = math.floor(length / 20)
-    
-    for i = 1, numPaths do
-        local xPos = (i % 2 == 0) and 10 or -10
-        local safePath = Instance.new("Part")
-        safePath.Name = "SafePath"
-        safePath.Size = Vector3.new(pathWidth, 0.6, 12)
-        safePath.Position = Vector3.new(xPos, 0.3, zStart + (i - 0.5) * (length / numPaths))
-        safePath.Anchored = true
-        safePath.BrickColor = BrickColor.new("Bright yellow")
-        safePath.Material = Enum.Material.Cobblestone
-        safePath.Parent = parent
-        
-        table.insert(ActiveGimmicks, safePath)
-    end
-    
-    local inSlime = {}
-    local safePaths = {}
-    
-    for _, child in ipairs(parent:GetChildren()) do
-        if child.Name == "SafePath" then
-            child.Touched:Connect(function(hit)
-                local char = hit.Parent
-                if char:FindFirstChild("Humanoid") then
-                    safePaths[char] = true
-                end
-            end)
-            child.TouchEnded:Connect(function(hit)
-                local char = hit.Parent
-                safePaths[char] = nil
-            end)
-        end
-    end
-    
-    slimeBase.Touched:Connect(function(hit)
-        if not hit or not hit.Parent then return end
-        local hum = hit.Parent:FindFirstChild("Humanoid")
-        if hum and not inSlime[hit.Parent] and not safePaths[hit.Parent] then
-            inSlime[hit.Parent] = hum.WalkSpeed
-            hum.WalkSpeed = hum.WalkSpeed * Config.SlimeSlowFactor
-        end
-    end)
-    
-    slimeBase.TouchEnded:Connect(function(hit)
-        if not hit or not hit.Parent then return end
-        local hum = hit.Parent:FindFirstChild("Humanoid")
-        if hum and inSlime[hit.Parent] then
-            hum.WalkSpeed = inSlime[hit.Parent]
-            inSlime[hit.Parent] = nil
-        end
-    end)
-    
-    table.insert(ActiveGimmicks, slimeBase)
-end
-
--- 🥊 펀칭 글러브 (속도 감소 효과로 변경!)
-local function CreatePunchingCorridor(parent, zStart, length)
-    if not Config.EnablePunchingGloves then return end
-    
-    local corridorWidth = 12
-    local TW = Config.TRACK_WIDTH
-    
-    for _, xOffset in ipairs({-corridorWidth/2 - 5, corridorWidth/2 + 5}) do
-        local wall = Instance.new("Part")
-        wall.Size = Vector3.new((TW - corridorWidth) / 2, 10, length)
-        wall.Position = Vector3.new((xOffset > 0) and (TW/4 + corridorWidth/4) or (-TW/4 - corridorWidth/4), 5, zStart + length/2)
-        wall.Anchored = true
-        wall.BrickColor = BrickColor.new("Dark stone grey")
-        wall.Material = Enum.Material.Brick
-        wall.Parent = parent
-        
-        table.insert(ActiveGimmicks, wall)
-    end
-    
-    local numGloves = math.floor(length / 25)
-    
-    for i = 1, numGloves do
-        local zPos = zStart + i * (length / (numGloves + 1))
-        local side = (i % 2 == 0) and 1 or -1
-        local xPos = side * (corridorWidth/2 + 3)
-        
-        local glove = Instance.new("Part")
-        glove.Name = "PunchingGlove"
-        glove.Size = Vector3.new(5, 5, 5)
-        glove.Position = Vector3.new(xPos, 4, zPos)
-        glove.Anchored = true
-        glove.BrickColor = BrickColor.new("Bright red")
-        glove.Material = Enum.Material.SmoothPlastic
-        glove.Parent = parent
-        
-        local gloveGui = Instance.new("SurfaceGui")
-        gloveGui.Face = (side == 1) and Enum.NormalId.Left or Enum.NormalId.Right
-        gloveGui.Parent = glove
-        
-        local gloveLabel = Instance.new("TextLabel")
-        gloveLabel.Size = UDim2.new(1, 0, 1, 0)
-        gloveLabel.BackgroundTransparency = 1
-        gloveLabel.Text = "🥊"
-        gloveLabel.TextScaled = true
-        gloveLabel.Parent = gloveGui
-        
-        local gloveFrontGui = Instance.new("SurfaceGui")
-        gloveFrontGui.Face = Enum.NormalId.Front
-        gloveFrontGui.Parent = glove
-        
-        local gloveFrontLabel = Instance.new("TextLabel")
-        gloveFrontLabel.Size = UDim2.new(1, 0, 1, 0)
-        gloveFrontLabel.BackgroundTransparency = 1
-        gloveFrontLabel.Text = "🥊"
-        gloveFrontLabel.TextScaled = true
-        gloveFrontLabel.Parent = gloveFrontGui
-        
-        local retracted = Vector3.new(xPos, 4, zPos)
-        local extended = Vector3.new(-side * (corridorWidth/2 - 2), 4, zPos)
-        
-        task.spawn(function()
-            task.wait(i * 0.3)
-            while glove and glove.Parent do
-                task.wait(2 / Config.ObstacleSpeed)
-                glove.BrickColor = BrickColor.new("Really red")
-                task.wait(0.3)
-                TweenService:Create(glove, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Position = extended}):Play()
-                task.wait(0.2)
-                TweenService:Create(glove, TweenInfo.new(0.4), {Position = retracted}):Play()
-                glove.BrickColor = BrickColor.new("Bright red")
-                task.wait(0.4)
-            end
+    for i, gimmick in ipairs(courseData.gimmicks) do
+        local success, result = pcall(function()
+            return GimmickRegistry:Build(gimmick.type, parent, gimmick)
         end)
-        
-        -- 🔧 수정: 튕기기 대신 속도 감소!
-        local db = {}
-        glove.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            local hum = hit.Parent:FindFirstChild("Humanoid")
-            if player and hum and not db[player] then
-                db[player] = true
-                local origSpeed = hum.WalkSpeed
-                local origJump = hum.JumpPower
-                hum.WalkSpeed = origSpeed * 0.3
-                hum.JumpPower = 0
-                Events.ItemEffect:FireClient(player, "PunchStun", {duration = 1.5})
-                task.delay(1.5, function()
-                    if hum then
-                        hum.WalkSpeed = origSpeed
-                        hum.JumpPower = origJump
-                    end
-                    db[player] = nil
-                end)
-            end
-        end)
-        
-        table.insert(ActiveGimmicks, glove)
-    end
-end
 
-local function CreateQuizGate(parent, gateId, triggerZ, gateZ, optionCount)
-    if not Config.EnableQuizGates then return end
-    
-    local quiz = GetQuizByOptionCount(optionCount)
-    local TW = Config.TRACK_WIDTH
-    
-    local trigger = Instance.new("Part")
-    trigger.Size = Vector3.new(TW, 10, 5)
-    trigger.Position = Vector3.new(0, 5, triggerZ)
-    trigger.Anchored = true
-    trigger.CanCollide = false
-    trigger.Transparency = 1
-    trigger.Parent = parent
-    
-    local triggerFloor = Instance.new("Part")
-    triggerFloor.Size = Vector3.new(TW, 0.5, 5)
-    triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
-    triggerFloor.Anchored = true
-    triggerFloor.CanCollide = false
-    triggerFloor.BrickColor = BrickColor.new("Bright violet")
-    triggerFloor.Material = Enum.Material.Neon
-    triggerFloor.Transparency = 0.5
-    triggerFloor.Parent = parent
-    
-    local gateWidth = TW / optionCount
-    for i = 1, optionCount do
-        local xPos = -TW/2 + gateWidth/2 + (i-1) * gateWidth
-        local gate = Instance.new("Part")
-        gate.Name = "Gate" .. gateId .. "_" .. i
-        gate.Size = Vector3.new(gateWidth - 1, 14, 3)
-        gate.Position = Vector3.new(xPos, 7, gateZ)
-        gate.Anchored = true
-        gate.CanCollide = false
-        gate.Color = gateColors[i]
-        gate.Material = Enum.Material.Neon
-        gate.Transparency = 0.2
-        gate.Parent = parent
-        
-        local outline = Instance.new("SelectionBox")
-        outline.Adornee = gate
-        outline.Color3 = gateColors[i]
-        outline.LineThickness = 0.05
-        outline.Parent = gate
-        
-        local gui = Instance.new("SurfaceGui")
-        gui.Face = Enum.NormalId.Back
-        gui.Parent = gate
-        
-        local num = Instance.new("TextLabel")
-        num.Size = UDim2.new(1,0,0.35,0)
-        num.BackgroundTransparency = 1
-        num.Text = "[" .. i .. "]"
-        num.TextColor3 = Color3.new(1,1,1)
-        num.TextScaled = true
-        num.Font = Enum.Font.GothamBold
-        num.Parent = gui
-        
-        local opt = Instance.new("TextLabel")
-        opt.Size = UDim2.new(0.9,0,0.55,0)
-        opt.Position = UDim2.new(0.05,0,0.4,0)
-        opt.BackgroundTransparency = 1
-        opt.Text = quiz.o[i]
-        opt.TextColor3 = Color3.new(1,1,1)
-        opt.TextScaled = true
-        opt.Font = Enum.Font.GothamBold
-        opt.Parent = gui
-        
-        local db = {}
-        gate.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            if not player or db[player] then return end
-            local answer = PlayerGateAnswers[player] and PlayerGateAnswers[player][gateId]
-            if answer == i then
-                Events.ItemEffect:FireClient(player, "GateCorrect", {})
-                AwardXP(player, XPRewards.QuizCorrect, "Quiz Correct!")
-            else
-                db[player] = true
-                local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-                local hum = hit.Parent:FindFirstChild("Humanoid")
-                if hum and rp then
-                    local origSpeed = hum.WalkSpeed
-                    local origJump = hum.JumpPower
-                    hum.WalkSpeed = 0
-                    hum.JumpPower = 0
-                    local bv = Instance.new("BodyVelocity")
-                    bv.MaxForce = Vector3.new(50000,50000,50000)
-                    bv.Velocity = Vector3.new(0, 22, -50)
-                    bv.Parent = rp
-                    Debris:AddItem(bv, 0.3)
-                    Events.ItemEffect:FireClient(player, "GateWrong", {duration = 1.2})
-                    task.delay(1.2, function()
-                        if hum then hum.WalkSpeed = origSpeed; hum.JumpPower = origJump end
-                        db[player] = nil
-                    end)
-                end
-            end
-        end)
-        
-        table.insert(ActiveGimmicks, gate)
-    end
-    
-    local triggered = {}
-    trigger.Touched:Connect(function(hit)
-        local player = Players:GetPlayerFromCharacter(hit.Parent)
-        if not player or triggered[player] then return end
-        triggered[player] = true
-        if not PlayerGateAnswers[player] then PlayerGateAnswers[player] = {} end
-        PlayerGateAnswers[player][gateId] = quiz.a
-        Events.GateQuiz:FireClient(player, {
-            gateId = gateId, 
-            question = quiz.q, 
-            options = quiz.o, 
-            optionCount = optionCount,
-            colors = gateColors
-        })
-        task.delay(20, function() triggered[player] = nil end)
-    end)
-    
-    table.insert(ActiveGimmicks, trigger)
-end
-
--- 🛗 엘리베이터 (5초 대기 + 2층 바닥 틈 없음!)
-local function CreateElevator(parent, elevId, triggerZ, elevZ, optionCount)
-    if not Config.EnableElevators then return end
-    
-    local quiz = GetQuizByOptionCount(optionCount)
-    local TW = Config.TRACK_WIDTH
-    local platformLength = 22
-    local elevationHeight = 15
-    local startY = 1  -- 🔧 판넬 시작 높이 (바닥 위)
-    
-    -- 검은 구멍 (시각 효과) - 판넬 아래
-    local hole = Instance.new("Part")
-    hole.Size = Vector3.new(TW, 1, platformLength + 4)
-    hole.Position = Vector3.new(0, -0.5, elevZ)
-    hole.Anchored = true
-    hole.CanCollide = false
-    hole.BrickColor = BrickColor.new("Really black")
-    hole.Parent = parent
-    
-    -- 트리거 존
-    local trigger = Instance.new("Part")
-    trigger.Size = Vector3.new(TW, 10, 5)
-    trigger.Position = Vector3.new(0, 5, triggerZ)
-    trigger.Anchored = true
-    trigger.CanCollide = false
-    trigger.Transparency = 1
-    trigger.Parent = parent
-    
-    -- 트리거 바닥 표시 (파란색 선)
-    local triggerFloor = Instance.new("Part")
-    triggerFloor.Size = Vector3.new(TW, 0.5, 5)
-    triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
-    triggerFloor.Anchored = true
-    triggerFloor.CanCollide = false
-    triggerFloor.BrickColor = BrickColor.new("Cyan")
-    triggerFloor.Material = Enum.Material.Neon
-    triggerFloor.Transparency = 0.5
-    triggerFloor.Parent = parent
-    
-    local platWidth = TW / optionCount
-    local platforms = {}
-    
-    for i = 1, optionCount do
-        local xPos = -TW/2 + platWidth/2 + (i-1) * platWidth
-        
-        -- 메인 판넬 (두껍게)
-        local plat = Instance.new("Part")
-        plat.Size = Vector3.new(platWidth - 1, 4, platformLength)
-        plat.Position = Vector3.new(xPos, startY, elevZ)
-        plat.Anchored = true
-        plat.BrickColor = BrickColor.new("Medium stone grey")
-        plat.Material = Enum.Material.Concrete
-        plat.Parent = parent
-        
-        -- 색상 표시 상단
-        local colorTop = Instance.new("Part")
-        colorTop.Size = Vector3.new(platWidth - 1, 0.5, platformLength)
-        colorTop.Position = Vector3.new(xPos, startY + 2.25, elevZ)
-        colorTop.Anchored = true
-        colorTop.Color = gateColors[i]
-        colorTop.Material = Enum.Material.Neon
-        colorTop.Parent = parent
-        
-        -- 번호/옵션 표시
-        local numPart = Instance.new("Part")
-        numPart.Size = Vector3.new(platWidth - 2, 5, 1)
-        numPart.Position = Vector3.new(xPos, startY + 5, elevZ - platformLength/2 + 1)
-        numPart.Anchored = true
-        numPart.CanCollide = false
-        numPart.Transparency = 1
-        numPart.Parent = parent
-        
-        local gui = Instance.new("SurfaceGui")
-        gui.Face = Enum.NormalId.Front
-        gui.Parent = numPart
-        local num = Instance.new("TextLabel")
-        num.Size = UDim2.new(1,0,0.5,0)
-        num.BackgroundTransparency = 1
-        num.Text = "[" .. i .. "]"
-        num.TextColor3 = Color3.new(1,1,1)
-        num.TextScaled = true
-        num.Font = Enum.Font.GothamBold
-        num.Parent = gui
-        local opt = Instance.new("TextLabel")
-        opt.Size = UDim2.new(1,0,0.5,0)
-        opt.Position = UDim2.new(0,0,0.5,0)
-        opt.BackgroundTransparency = 1
-        opt.Text = quiz.o[i]
-        opt.TextColor3 = Color3.new(1,1,1)
-        opt.TextScaled = true
-        opt.Font = Enum.Font.GothamBold
-        opt.Parent = gui
-        
-        platforms[i] = {
-            plat = plat, 
-            colorTop = colorTop, 
-            numPart = numPart, 
-            correct = (i == quiz.a), 
-            startY = startY,
-            targetY = elevationHeight + startY  -- 판넬이 올라갈 높이
-        }
-        
-        -- 플랫폼 터치 시 퀴즈 숨김 + 정답/오답 처리
-        local platDb = {}
-        plat.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            if not player or platDb[player] then return end
-            platDb[player] = true
-            
-            -- 퀴즈 UI 숨기기
-            if i == quiz.a then
-                Events.ItemEffect:FireClient(player, "GateCorrect", {})
-                AwardXP(player, XPRewards.QuizCorrect, "Elevator Correct!")
-            else
-                Events.ItemEffect:FireClient(player, "GateWrong", {})
-            end
-            
-            task.delay(3, function() platDb[player] = nil end)
-        end)
-        
-        table.insert(ActiveGimmicks, plat)
-    end
-    
-    -- 🔧 2층 바닥 - 판넬 바로 뒤에 연결!
-    local upperFloorY = elevationHeight + startY + 1  -- 판넬 도착 높이와 맞춤
-    local upperFloor = Instance.new("Part")
-    upperFloor.Size = Vector3.new(TW, 3, platformLength + 10)
-    upperFloor.Position = Vector3.new(0, upperFloorY, elevZ + platformLength)  -- 판넬 바로 뒤
-    upperFloor.Anchored = true
-    upperFloor.BrickColor = BrickColor.new("Brick yellow")
-    upperFloor.Material = Enum.Material.Cobblestone
-    upperFloor.Parent = parent
-    
-    -- 연결 바닥 (판넬과 2층 사이 틈 방지)
-    local bridge = Instance.new("Part")
-    bridge.Size = Vector3.new(TW, 1, 5)
-    bridge.Position = Vector3.new(0, upperFloorY - 1, elevZ + platformLength/2 + 2)
-    bridge.Anchored = true
-    bridge.BrickColor = BrickColor.new("Brick yellow")
-    bridge.Material = Enum.Material.Cobblestone
-    bridge.Parent = parent
-    
-    -- 아래 지지대 (시각용)
-    local underFloor = Instance.new("Part")
-    underFloor.Size = Vector3.new(TW + 10, 10, 100)
-    underFloor.Position = Vector3.new(0, -10, elevZ + platformLength + 30)
-    underFloor.Anchored = true
-    underFloor.BrickColor = BrickColor.new("Dark stone grey")
-    underFloor.Material = Enum.Material.Brick
-    underFloor.Parent = parent
-    
-    -- 내리막 램프 (2층에서 1층으로)
-    local ramp = Instance.new("Part")
-    ramp.Size = Vector3.new(TW, 3, 50)
-    local rampZ = elevZ + platformLength + platformLength/2 + 30
-    ramp.Position = Vector3.new(0, upperFloorY/2, rampZ)
-    ramp.Anchored = true
-    ramp.BrickColor = BrickColor.new("Brick yellow")
-    ramp.Material = Enum.Material.Cobblestone
-    ramp.CFrame = CFrame.new(ramp.Position) * CFrame.Angles(math.rad(18), 0, 0)
-    ramp.Parent = parent
-    
-    -- 램프 지지대
-    local rampSupport = Instance.new("Part")
-    rampSupport.Size = Vector3.new(TW, upperFloorY, 50)
-    rampSupport.Position = Vector3.new(0, -3, rampZ)
-    rampSupport.Anchored = true
-    rampSupport.BrickColor = BrickColor.new("Dark stone grey")
-    rampSupport.Material = Enum.Material.Brick
-    rampSupport.Parent = parent
-    
-    local triggered = {}
-    trigger.Touched:Connect(function(hit)
-        local player = Players:GetPlayerFromCharacter(hit.Parent)
-        if not player or triggered[player] then return end
-        triggered[player] = true
-        
-        Events.GateQuiz:FireClient(player, {
-            gateId = "elev" .. elevId,
-            question = quiz.q,
-            options = quiz.o,
-            optionCount = optionCount,
-            isElevator = true,
-            colors = gateColors
-        })
-        
-        -- 🔧 5초 대기 (퀴즈 확인 후 도달할 시간)
-        task.delay(5, function()
-            for i, p in ipairs(platforms) do
-                local riseTime = p.correct and 1.5 or 4
-                local targetY = p.targetY
-                
-                TweenService:Create(p.plat, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
-                    Position = Vector3.new(p.plat.Position.X, targetY, p.plat.Position.Z)
-                }):Play()
-                TweenService:Create(p.colorTop, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
-                    Position = Vector3.new(p.colorTop.Position.X, targetY + 2.25, p.colorTop.Position.Z)
-                }):Play()
-                TweenService:Create(p.numPart, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
-                    Position = Vector3.new(p.numPart.Position.X, targetY + 5, p.numPart.Position.Z)
-                }):Play()
-            end
-        end)
-        
-        task.delay(25, function()
-            for _, p in ipairs(platforms) do
-                TweenService:Create(p.plat, TweenInfo.new(2), {Position = Vector3.new(p.plat.Position.X, p.startY, p.plat.Position.Z)}):Play()
-                TweenService:Create(p.colorTop, TweenInfo.new(2), {Position = Vector3.new(p.colorTop.Position.X, p.startY + 2.25, p.colorTop.Position.Z)}):Play()
-                TweenService:Create(p.numPart, TweenInfo.new(2), {Position = Vector3.new(p.numPart.Position.X, p.startY + 5, p.numPart.Position.Z)}):Play()
-            end
-            triggered[player] = nil
-        end)
-    end)
-    
-    table.insert(ActiveGimmicks, trigger)
-    table.insert(ActiveGimmicks, upperFloor)
-    table.insert(ActiveGimmicks, underFloor)
-    table.insert(ActiveGimmicks, ramp)
-    table.insert(ActiveGimmicks, rampSupport)
-end
-
-local function CreateConveyorBelt(parent, zStart, length, direction)
-    if not Config.EnableConveyorBelt then return end
-    
-    local TW = Config.TRACK_WIDTH
-    
-    local belt = Instance.new("Part")
-    belt.Size = Vector3.new(TW - 4, 1, length)
-    belt.Position = Vector3.new(0, 0.5, zStart + length/2)
-    belt.Anchored = true
-    belt.BrickColor = BrickColor.new("Dark stone grey")
-    belt.Material = Enum.Material.DiamondPlate
-    belt.Parent = parent
-    
-    local signPart = Instance.new("Part")
-    signPart.Size = Vector3.new(10, 5, 1)
-    signPart.Position = Vector3.new(0, 5, zStart - 3)
-    signPart.Anchored = true
-    signPart.CanCollide = false
-    signPart.Transparency = 0.5
-    signPart.BrickColor = BrickColor.new("Bright yellow")
-    signPart.Parent = parent
-    
-    local signGui = Instance.new("SurfaceGui")
-    signGui.Face = Enum.NormalId.Front
-    signGui.Parent = signPart
-    local signLabel = Instance.new("TextLabel")
-    signLabel.Size = UDim2.new(1, 0, 1, 0)
-    signLabel.BackgroundTransparency = 1
-    signLabel.Text = "⬅️ CONVEYOR"
-    signLabel.TextColor3 = Color3.new(0, 0, 0)
-    signLabel.TextScaled = true
-    signLabel.Font = Enum.Font.GothamBold
-    signLabel.Parent = signGui
-    
-    local playersOnBelt = {}
-    belt.Touched:Connect(function(hit)
-        local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-        if rp then playersOnBelt[hit.Parent] = true end
-    end)
-    belt.TouchEnded:Connect(function(hit) playersOnBelt[hit.Parent] = nil end)
-    
-    task.spawn(function()
-        while belt and belt.Parent do
-            for char, _ in pairs(playersOnBelt) do
-                local rp = char:FindFirstChild("HumanoidRootPart")
-                -- 속도 대폭 줄임: 0.05 → 0.02 (점프+달리기로 통과 가능)
-                if rp then rp.CFrame = rp.CFrame + Vector3.new(0, 0, direction * 0.02) end
-            end
-            task.wait()
+        if success and result then
+            builtCount = builtCount + 1
+        elseif success then
+            -- nil returned (config disabled)
+            builtCount = builtCount + 1
+        else
+            errorCount = errorCount + 1
+            warn(string.format("[CourseEngine] Failed to build gimmick #%d (%s): %s",
+                i, gimmick.type, tostring(result)))
         end
-    end)
-    
-    table.insert(ActiveGimmicks, belt)
-    table.insert(ActiveGimmicks, signPart)
-end
-
-local function CreateElectricFloor(parent, zStart, length)
-    if not Config.EnableElectricFloor then return end
-    
-    local TW = Config.TRACK_WIDTH
-    
-    local floor = Instance.new("Part")
-    floor.Name = "ElectricFloor"
-    floor.Size = Vector3.new(TW - 4, 0.5, length + 20)
-    floor.Position = Vector3.new(0, 0.25, zStart + length/2)
-    floor.Anchored = true
-    floor.BrickColor = BrickColor.new("Medium stone grey")
-    floor.Material = Enum.Material.Metal
-    floor.Parent = parent
-    
-    for i = 1, math.floor(length / 12) do
-        local boltPart = Instance.new("Part")
-        boltPart.Size = Vector3.new(5, 0.1, 5)
-        boltPart.Position = Vector3.new(math.random(-12, 12), 0.35, zStart + i * 12)
-        boltPart.Anchored = true
-        boltPart.CanCollide = false
-        boltPart.Transparency = 1
-        boltPart.Parent = parent
-        
-        local boltGui = Instance.new("SurfaceGui")
-        boltGui.Face = Enum.NormalId.Top
-        boltGui.Parent = boltPart
-        
-        local boltLabel = Instance.new("TextLabel")
-        boltLabel.Size = UDim2.new(1, 0, 1, 0)
-        boltLabel.BackgroundTransparency = 1
-        boltLabel.Text = "⚡"
-        boltLabel.TextScaled = true
-        boltLabel.Parent = boltGui
-        
-        table.insert(ActiveGimmicks, boltPart)
     end
-    
-    local warnSign = Instance.new("Part")
-    warnSign.Size = Vector3.new(12, 6, 1)
-    warnSign.Position = Vector3.new(0, 5, zStart - 5)
-    warnSign.Anchored = true
-    warnSign.CanCollide = false
-    warnSign.BrickColor = BrickColor.new("Bright yellow")
-    warnSign.Parent = parent
-    
-    local warnGui = Instance.new("SurfaceGui")
-    warnGui.Face = Enum.NormalId.Front
-    warnGui.Parent = warnSign
-    local warnLabel = Instance.new("TextLabel")
-    warnLabel.Size = UDim2.new(1, 0, 1, 0)
-    warnLabel.BackgroundTransparency = 1
-    warnLabel.Text = "⚡ DANGER ⚡"
-    warnLabel.TextColor3 = Color3.new(0, 0, 0)
-    warnLabel.TextScaled = true
-    warnLabel.Font = Enum.Font.GothamBold
-    warnLabel.Parent = warnGui
-    
-    local playersOnFloor = {}
-    
-    floor.Touched:Connect(function(hit)
-        local player = Players:GetPlayerFromCharacter(hit.Parent)
-        if player then playersOnFloor[player] = true end
-    end)
-    floor.TouchEnded:Connect(function(hit)
-        local player = Players:GetPlayerFromCharacter(hit.Parent)
-        if player then playersOnFloor[player] = nil end
-    end)
-    
-    task.spawn(function()
-        while floor and floor.Parent do
-            floor.BrickColor = BrickColor.new("Bright yellow")
-            floor.Material = Enum.Material.Metal
-            task.wait(1.5)
-            floor.BrickColor = BrickColor.new("Cyan")
-            floor.Material = Enum.Material.Neon
-            for player, _ in pairs(playersOnFloor) do
-                Events.ItemEffect:FireClient(player, "Electrocuted", {duration = 0.8})
-            end
-            task.wait(0.6)
-            floor.BrickColor = BrickColor.new("Medium stone grey")
-            floor.Material = Enum.Material.Metal
-            task.wait(2)
-        end
-    end)
-    
-    table.insert(ActiveGimmicks, floor)
-    table.insert(ActiveGimmicks, warnSign)
+
+    print(string.format("✅ Course complete: %d gimmicks built, %d errors",
+        builtCount, errorCount))
+
+    return builtCount, errorCount
 end
 
-local function CreateRollingBoulder(parent, zStart, zEnd)
-    if not Config.EnableRollingBoulder then return end
-    
-    local warnSign = Instance.new("Part")
-    warnSign.Size = Vector3.new(12, 8, 1)
-    warnSign.Position = Vector3.new(0, 6, zStart - 15)
-    warnSign.Anchored = true
-    warnSign.CanCollide = false
-    warnSign.BrickColor = BrickColor.new("Bright red")
-    warnSign.Parent = parent
-    
-    local warnGui = Instance.new("SurfaceGui")
-    warnGui.Face = Enum.NormalId.Front
-    warnGui.Parent = warnSign
-    local warnLabel = Instance.new("TextLabel")
-    warnLabel.Size = UDim2.new(1,0,1,0)
-    warnLabel.BackgroundTransparency = 1
-    warnLabel.Text = "⚠️ BOULDER! ⚠️\n🪨 DODGE! 🪨"
-    warnLabel.TextColor3 = Color3.new(1,1,1)
-    warnLabel.TextScaled = true
-    warnLabel.Font = Enum.Font.GothamBold
-    warnLabel.Parent = warnGui
-    
-    task.spawn(function()
-        while parent and parent.Parent do
-            task.wait(7 / Config.ObstacleSpeed)
-            
-            local boulder = Instance.new("Part")
-            boulder.Size = Vector3.new(10, 10, 10)
-            boulder.Position = Vector3.new(0, 6, zEnd + 5)
-            boulder.Anchored = false
-            boulder.Shape = Enum.PartType.Ball
-            boulder.BrickColor = BrickColor.new("Dark stone grey")
-            boulder.Material = Enum.Material.Slate
-            boulder.Parent = parent
-            
-            local bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
-            bv.Velocity = Vector3.new(0, 0, -45 * Config.ObstacleSpeed)
-            bv.Parent = boulder
-            
-            local db = {}
-            boulder.Touched:Connect(function(hit)
-                local player = Players:GetPlayerFromCharacter(hit.Parent)
-                if player and not db[player] then
-                    db[player] = true
-                    Events.ItemEffect:FireClient(player, "BoulderHit", {direction = Vector3.new(0, 35, -55)})
-                    task.delay(1, function() db[player] = nil end)
-                end
-            end)
-            
-            task.delay(12, function() if boulder and boulder.Parent then boulder:Destroy() end end)
-        end
-    end)
-    
-    table.insert(ActiveGimmicks, warnSign)
-end
+function CourseEngine:ValidateCourseData(courseData)
+    local errors = {}
 
-local function CreateDisappearingBridge(parent, zStart, platformCount)
-    if not Config.EnableDisappearingBridge then return end
-    
-    local platformWidth = 10
-    local gap = 6
-    local TW = Config.TRACK_WIDTH
-    
-    local lava = Instance.new("Part")
-    lava.Size = Vector3.new(TW, 1, platformCount * (platformWidth + gap) + 20)
-    lava.Position = Vector3.new(0, -15, zStart + platformCount * (platformWidth + gap) / 2)
-    lava.Anchored = true
-    lava.CanCollide = false
-    lava.BrickColor = BrickColor.new("Bright orange")
-    lava.Material = Enum.Material.Neon
-    lava.Parent = parent
-    
-    local lavaTop = Instance.new("Part")
-    lavaTop.Size = Vector3.new(TW - 2, 0.5, platformCount * (platformWidth + gap) + 18)
-    lavaTop.Position = Vector3.new(0, -14.5, zStart + platformCount * (platformWidth + gap) / 2)
-    lavaTop.Anchored = true
-    lavaTop.CanCollide = false
-    lavaTop.BrickColor = BrickColor.new("Bright red")
-    lavaTop.Material = Enum.Material.Neon
-    lavaTop.Transparency = 0.3
-    lavaTop.Parent = parent
-    
-    lava.Touched:Connect(function(hit)
-        local player = Players:GetPlayerFromCharacter(hit.Parent)
-        if player then Events.ItemEffect:FireClient(player, "LavaFall", {}) end
-    end)
-    
-    local warnSign = Instance.new("Part")
-    warnSign.Size = Vector3.new(14, 7, 1)
-    warnSign.Position = Vector3.new(0, 6, zStart - 8)
-    warnSign.Anchored = true
-    warnSign.CanCollide = false
-    warnSign.BrickColor = BrickColor.new("Bright orange")
-    warnSign.Parent = parent
-    
-    local warnGui = Instance.new("SurfaceGui")
-    warnGui.Face = Enum.NormalId.Front
-    warnGui.Parent = warnSign
-    local warnLabel = Instance.new("TextLabel")
-    warnLabel.Size = UDim2.new(1, 0, 1, 0)
-    warnLabel.BackgroundTransparency = 1
-    warnLabel.Text = "⏰ DISAPPEARING!\n🔥 DON'T STOP! 🔥"
-    warnLabel.TextColor3 = Color3.new(1, 1, 1)
-    warnLabel.TextScaled = true
-    warnLabel.Font = Enum.Font.GothamBold
-    warnLabel.Parent = warnGui
-    
-    for i = 1, platformCount do
-        local z = zStart + (i - 1) * (platformWidth + gap)
-        local xOffset = (i % 2 == 0) and -8 or 8
-        
-        local platform = Instance.new("Part")
-        platform.Name = "DisappearingPlatform"
-        platform.Size = Vector3.new(14, 2, platformWidth)
-        platform.Position = Vector3.new(xOffset, 1, z)
-        platform.Anchored = true
-        platform.BrickColor = BrickColor.new("Bright orange")
-        platform.Material = Enum.Material.Wood
-        platform.Parent = parent
-        
-        local clockGui = Instance.new("SurfaceGui")
-        clockGui.Face = Enum.NormalId.Top
-        clockGui.Parent = platform
-        
-        local clockLabel = Instance.new("TextLabel")
-        clockLabel.Size = UDim2.new(1, 0, 1, 0)
-        clockLabel.BackgroundTransparency = 1
-        clockLabel.Text = "⏰"
-        clockLabel.TextScaled = true
-        clockLabel.Parent = clockGui
-        
-        local db = {}
-        platform.Touched:Connect(function(hit)
-            local hum = hit.Parent:FindFirstChild("Humanoid")
-            if hum and not db[platform] then
-                db[platform] = true
-                TweenService:Create(platform, TweenInfo.new(0.2), {Color = Color3.fromRGB(255, 0, 0)}):Play()
-                clockLabel.Text = "⏰❗"
-                
-                task.delay(1.2, function()
-                    platform.CanCollide = false
-                    TweenService:Create(platform, TweenInfo.new(0.3), {
-                        Transparency = 1,
-                        Position = platform.Position + Vector3.new(0, -2, 0)
-                    }):Play()
-                    
-                    task.delay(3, function()
-                        platform.Position = Vector3.new(xOffset, 1, z)
-                        platform.CanCollide = true
-                        platform.BrickColor = BrickColor.new("Bright orange")
-                        clockLabel.Text = "⏰"
-                        TweenService:Create(platform, TweenInfo.new(0.3), {Transparency = 0}):Play()
-                        db[platform] = nil
-                    end)
-                end)
-            end
-        end)
-        
-        table.insert(ActiveGimmicks, platform)
+    if not courseData.metadata then
+        table.insert(errors, "Missing metadata")
     end
-    
-    table.insert(ActiveGimmicks, lava)
-    table.insert(ActiveGimmicks, lavaTop)
-    table.insert(ActiveGimmicks, warnSign)
+
+    if not courseData.gimmicks or #courseData.gimmicks == 0 then
+        table.insert(errors, "No gimmicks defined")
+    end
+
+    for i, gimmick in ipairs(courseData.gimmicks or {}) do
+        if not gimmick.type then
+            table.insert(errors, string.format("Gimmick #%d missing type", i))
+        elseif not GimmickRegistry.builders[gimmick.type] then
+            table.insert(errors, string.format("Unknown gimmick type: %s", gimmick.type))
+        end
+    end
+
+    return #errors == 0, errors
 end
 
 -- ============================================
--- 🏗️ BUILD FULL COURSE
+-- 📋 DEFAULT COURSE DATA
+-- ============================================
+local DefaultCourseData = {
+    metadata = {
+        name = "Quiz Castle Classic",
+        author = "System",
+        version = "3.2",
+        length = 2000,
+        difficulty = "medium"
+    },
+    gimmicks = {
+        -- 구간 1: 워밍업
+        {type = "RotatingBar", z = 60, width = 28, height = 3, speed = 1.5},
+        {type = "RotatingBar", z = 100, width = 30, height = 3, speed = 1.8},
+        {type = "QuizGate", id = 1, triggerZ = 150, gateZ = 180, options = 2},
+        {type = "RotatingBar", z = 250, width = 26, height = 3, speed = 2},
+        {type = "QuizGate", id = 2, triggerZ = 320, gateZ = 350, options = 3},
+
+        -- 구간 2: 점프 & 엘리베이터
+        {type = "JumpPad", x = 0, y = 0.5, z = 430},
+        {type = "JumpPad", x = 0, y = 0.5, z = 500},
+        {type = "JumpPad", x = 0, y = 0.5, z = 570},
+        {type = "Elevator", id = 1, triggerZ = 620, elevZ = 670, options = 3},
+        {type = "DisappearingBridge", z = 750, platformCount = 6},
+
+        -- 구간 3: 슬라임 & 퀴즈
+        {type = "SlimeZone", z = 830, length = 80},
+        {type = "QuizGate", id = 3, triggerZ = 960, gateZ = 990, options = 4},
+        {type = "ConveyorBelt", z = 1040, length = 60, direction = -1},
+        {type = "ElectricFloor", z = 1130, length = 60},
+
+        -- 구간 4: 위험지대
+        {type = "RollingBoulder", zStart = 1220, zEnd = 1380},
+        {type = "PunchingCorridor", z = 1280, length = 100},
+        {type = "QuizGate", id = 4, triggerZ = 1420, gateZ = 1450, options = 3},
+        {type = "Elevator", id = 2, triggerZ = 1500, elevZ = 1550, options = 4},
+
+        -- 구간 5: 파이널
+        {type = "SlimeZone", z = 1620, length = 70},
+        {type = "RotatingBar", z = 1730, width = 34, height = 3, speed = 2.5},
+        {type = "RotatingBar", z = 1760, width = 34, height = 7, speed = -2},
+        {type = "QuizGate", id = 5, triggerZ = 1800, gateZ = 1830, options = 2},
+        {type = "ConveyorBelt", z = 1860, length = 40, direction = -1},
+        {type = "ElectricFloor", z = 1920, length = 50},
+        {type = "RotatingBar", z = 1970, width = 36, height = 3, speed = 3}
+    }
+}
+
+-- ============================================
+-- 🏗️ BUILD FULL COURSE (CourseEngine 사용)
 -- ============================================
 local function BuildCourse(parent)
-    print("  Building Course Obstacles...")
-    
-    local TL = Config.TRACK_LENGTH
-    
-    CreateRotatingBar(parent, 60, 28, 3, 1.5)
-    CreateRotatingBar(parent, 100, 30, 3, 1.8)
-    CreateQuizGate(parent, 1, 150, 180, 2)
-    CreateRotatingBar(parent, 250, 26, 3, 2)
-    CreateQuizGate(parent, 2, 320, 350, 3)
-    
-    CreateJumpPad(parent, Vector3.new(0, 0.5, 430))
-    CreateJumpPad(parent, Vector3.new(0, 0.5, 500))
-    CreateJumpPad(parent, Vector3.new(0, 0.5, 570))
-    
-    CreateElevator(parent, 1, 620, 670, 3)
-    CreateDisappearingBridge(parent, 750, 6)
-    
-    CreateSlimeZone(parent, 830, 80)
-    CreateQuizGate(parent, 3, 960, 990, 4)
-    CreateConveyorBelt(parent, 1040, 60, -1)
-    CreateElectricFloor(parent, 1130, 60)
-    
-    CreateRollingBoulder(parent, 1220, 1380)
-    CreatePunchingCorridor(parent, 1280, 100)
-    CreateQuizGate(parent, 4, 1420, 1450, 3)
-    CreateElevator(parent, 2, 1500, 1550, 4)
-    
-    CreateSlimeZone(parent, 1620, 70)
-    CreateRotatingBar(parent, 1730, 34, 3, 2.5)
-    CreateRotatingBar(parent, 1760, 34, 7, -2)
-    CreateQuizGate(parent, 5, 1800, 1830, 2)
-    
-    CreateConveyorBelt(parent, 1860, 40, -1)
-    CreateElectricFloor(parent, 1920, 50)
-    CreateRotatingBar(parent, 1970, 36, 3, 3)
-    
-    print("  ✅ Course Obstacles Complete!")
+    CourseEngine:BuildFromData(parent, DefaultCourseData)
 end
 
 -- ============================================
