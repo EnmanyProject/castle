@@ -1146,25 +1146,34 @@
                 nextZ = lastZ + 70;
             }
 
-            // Set default values
+            // Set default values - process in specific order to avoid overwrites
+            // First, set all defaults
+            for (const [key, field] of Object.entries(schema.fields)) {
+                gimmick[key] = field.default;
+            }
+
+            // Then override with calculated values
             for (const [key, field] of Object.entries(schema.fields)) {
                 if (key === 'z' || key === 'triggerZ' || key === 'zStart') {
                     gimmick[key] = nextZ;
-                    if (key === 'triggerZ' && schema.fields.gateZ) {
-                        gimmick.gateZ = nextZ + 30;
-                    }
-                    if (key === 'triggerZ' && schema.fields.elevZ) {
-                        gimmick.elevZ = nextZ + 50;
-                    }
-                    if (key === 'zStart' && schema.fields.zEnd) {
-                        gimmick.zEnd = nextZ + 100;
-                    }
-                } else if (key === 'id') {
+                }
+                if (key === 'id') {
                     gimmickIdCounter[type] = (gimmickIdCounter[type] || 0) + 1;
                     gimmick[key] = gimmickIdCounter[type];
-                } else {
-                    gimmick[key] = field.default;
                 }
+            }
+
+            // Set related Z positions AFTER main Z is set
+            if (gimmick.triggerZ !== undefined) {
+                if (schema.fields.gateZ) {
+                    gimmick.gateZ = gimmick.triggerZ + 30;
+                }
+                if (schema.fields.elevZ) {
+                    gimmick.elevZ = gimmick.triggerZ + 50;
+                }
+            }
+            if (gimmick.zStart !== undefined && schema.fields.zEnd) {
+                gimmick.zEnd = gimmick.zStart + 100;
             }
 
             courseGimmicks.push(gimmick);
@@ -1309,14 +1318,18 @@
         }
 
         function updateGimmickProperty(key, value) {
-            if (selectedGimmickIndex < 0) return;
+            if (selectedGimmickIndex < 0 || selectedGimmickIndex >= courseGimmicks.length) return;
+
+            // Save reference to current gimmick BEFORE any changes
+            const currentGimmick = courseGimmicks[selectedGimmickIndex];
 
             const numValue = parseFloat(value);
-            courseGimmicks[selectedGimmickIndex][key] = isNaN(numValue) ? value : numValue;
+            currentGimmick[key] = isNaN(numValue) ? value : numValue;
 
             sortGimmicksByZ();
-            const newIndex = courseGimmicks.findIndex(g => g === courseGimmicks[selectedGimmickIndex]);
-            selectedGimmickIndex = newIndex >= 0 ? newIndex : selectedGimmickIndex;
+
+            // Find the new index of the same gimmick object after sorting
+            selectedGimmickIndex = courseGimmicks.indexOf(currentGimmick);
 
             renderGimmickList();
         }
