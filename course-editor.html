@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Castle - Course Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #4a4a8a;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            height: calc(100vh - 70px);
+        }
+
+        /* Left Panel - Gimmick Palette */
+        .palette-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-right: 2px solid #4a4a8a;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .palette-title {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .difficulty-section {
+            margin-bottom: 20px;
+        }
+
+        .difficulty-label {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .difficulty-label.easy { color: #38ef7d; }
+        .difficulty-label.medium { color: #feca57; }
+        .difficulty-label.hard { color: #ff6b6b; }
+
+        .gimmick-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: grab;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .gimmick-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .gimmick-item:active {
+            cursor: grabbing;
+        }
+
+        .gimmick-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            text-align: center;
+        }
+
+        .gimmick-info {
+            flex: 1;
+        }
+
+        .gimmick-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .gimmick-desc {
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 2px;
+        }
+
+        /* Center Panel - Track View */
+        .track-panel {
+            padding: 20px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .course-meta {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .meta-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .meta-field label {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .meta-field input, .meta-field select {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            padding: 8px;
+            color: white;
+        }
+
+        .track-view {
+            background: linear-gradient(180deg, #2d3436 0%, #636e72 100%);
+            border-radius: 10px;
+            min-height: 500px;
+            position: relative;
+            padding: 10px;
+            border: 2px dashed #4a4a8a;
+        }
+
+        .track-header {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .track-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .track-empty-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .gimmick-block {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+
+        .gimmick-block:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .gimmick-block.selected {
+            border-left-color: #48dbfb;
+            background: rgba(72, 219, 251, 0.2);
+        }
+
+        .gimmick-block.easy { border-left-color: #38ef7d; }
+        .gimmick-block.medium { border-left-color: #feca57; }
+        .gimmick-block.hard { border-left-color: #ff6b6b; }
+
+        .gimmick-block-icon {
+            font-size: 1.3rem;
+            width: 35px;
+            text-align: center;
+        }
+
+        .gimmick-block-info {
+            flex: 1;
+        }
+
+        .gimmick-block-name {
+            font-weight: 600;
+        }
+
+        .gimmick-block-params {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 3px;
+        }
+
+        .gimmick-block-z {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+
+        .gimmick-block-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .gimmick-block-actions button {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .gimmick-block-actions button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .gimmick-block-actions .delete-btn:hover {
+            background: rgba(255, 107, 107, 0.5);
+        }
+
+        /* Right Panel - Properties */
+        .properties-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 2px solid #4a4a8a;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .properties-title {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .properties-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+
+        .property-group {
+            margin-bottom: 20px;
+        }
+
+        .property-group-title {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .property-field {
+            margin-bottom: 12px;
+        }
+
+        .property-field label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+
+        .property-field input, .property-field select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            padding: 10px;
+            color: white;
+            font-size: 0.95rem;
+        }
+
+        .property-field input:focus, .property-field select:focus {
+            outline: none;
+            border-color: #48dbfb;
+        }
+
+        .property-field .hint {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .property-range {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .property-range input[type="range"] {
+            flex: 1;
+        }
+
+        .property-range .value {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px 10px;
+            border-radius: 4px;
+            min-width: 60px;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid #4a4a8a;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 1.3rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .export-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .export-tab {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-tab.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .export-code {
+            background: #0d0d1a;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #4a4a8a;
+        }
+
+        .copy-btn {
+            margin-top: 15px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a4a8a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5a5a9a;
+        }
+
+        /* Drop Zone */
+        .track-view.drag-over {
+            border-color: #48dbfb;
+            background: linear-gradient(180deg, #2d3436 0%, #48dbfb22 100%);
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #48dbfb;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🏰 Quiz Castle - Course Editor</h1>
+        <div class="header-buttons">
+            <button class="btn btn-primary" onclick="newCourse()">📄 New</button>
+            <button class="btn btn-primary" onclick="loadFromJson()">📂 Load</button>
+            <button class="btn btn-success" onclick="showExportModal()">💾 Export</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Left Panel - Gimmick Palette -->
+        <div class="palette-panel">
+            <div class="palette-title">🧩 Gimmick Palette</div>
+
+            <div class="difficulty-section">
+                <div class="difficulty-label easy">● Easy</div>
+                <div class="gimmick-item" draggable="true" data-type="RotatingBar">
+                    <div class="gimmick-icon">🔄</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">회전 막대</div>
+                        <div class="gimmick-desc">맞으면 튕겨남</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="JumpPad">
+                    <div class="gimmick-icon">🔺</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">점프 패드</div>
+                        <div class="gimmick-desc">밟으면 높이 점프</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="SlimeZone">
+                    <div class="gimmick-icon">👻</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">슬라임 구역</div>
+                        <div class="gimmick-desc">밟으면 느려짐</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-section">
+                <div class="difficulty-label medium">● Medium</div>
+                <div class="gimmick-item" draggable="true" data-type="PunchingCorridor">
+                    <div class="gimmick-icon">🥊</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">펀칭 복도</div>
+                        <div class="gimmick-desc">글러브가 펀치</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="QuizGate">
+                    <div class="gimmick-icon">🚪</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">퀴즈 게이트</div>
+                        <div class="gimmick-desc">정답 문으로 통과</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="ConveyorBelt">
+                    <div class="gimmick-icon">⬅️</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">컨베이어 벨트</div>
+                        <div class="gimmick-desc">뒤로 밀림</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="ElectricFloor">
+                    <div class="gimmick-icon">⚡</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">전기 바닥</div>
+                        <div class="gimmick-desc">주기적 감전</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-section">
+                <div class="difficulty-label hard">● Hard</div>
+                <div class="gimmick-item" draggable="true" data-type="Elevator">
+                    <div class="gimmick-icon">🛗</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">엘리베이터</div>
+                        <div class="gimmick-desc">정답이 빨리 올라감</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="RollingBoulder">
+                    <div class="gimmick-icon">🪨</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">굴러오는 바위</div>
+                        <div class="gimmick-desc">뒤에서 굴러옴</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="DisappearingBridge">
+                    <div class="gimmick-icon">⏰</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">사라지는 다리</div>
+                        <div class="gimmick-desc">밟으면 사라짐</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel - Track View -->
+        <div class="track-panel">
+            <div class="course-meta">
+                <div class="meta-field">
+                    <label>코스 이름</label>
+                    <input type="text" id="courseName" value="My Custom Course" placeholder="코스 이름">
+                </div>
+                <div class="meta-field">
+                    <label>제작자</label>
+                    <input type="text" id="courseAuthor" value="Anonymous" placeholder="제작자 이름">
+                </div>
+                <div class="meta-field">
+                    <label>트랙 길이</label>
+                    <input type="number" id="courseLength" value="2000" min="500" max="5000" step="100">
+                </div>
+                <div class="meta-field">
+                    <label>난이도</label>
+                    <select id="courseDifficulty">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">기믹:</span>
+                    <span class="stat-value" id="gimmickCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">퀴즈:</span>
+                    <span class="stat-value" id="quizCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">마지막 Z:</span>
+                    <span class="stat-value" id="lastZ">0</span>
+                </div>
+            </div>
+
+            <div class="track-view" id="trackView">
+                <div class="track-header">🏁 START (Z: 0) → FINISH (Z: <span id="trackLength">2000</span>) 🎯</div>
+                <div id="gimmickList">
+                    <div class="track-empty">
+                        <div class="track-empty-icon">📦</div>
+                        <div>왼쪽에서 기믹을 드래그하여 추가하세요</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Properties -->
+        <div class="properties-panel">
+            <div class="properties-title">⚙️ Properties</div>
+            <div id="propertiesContent">
+                <div class="properties-empty">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">👆</div>
+                    <div>기믹을 선택하여<br>속성을 편집하세요</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>💾 Export Course</h2>
+                <button class="modal-close" onclick="closeExportModal()">×</button>
+            </div>
+            <div class="export-tabs">
+                <button class="export-tab active" onclick="switchExportTab('lua')">Lua (Roblox)</button>
+                <button class="export-tab" onclick="switchExportTab('json')">JSON</button>
+            </div>
+            <pre class="export-code" id="exportCode"></pre>
+            <button class="btn btn-success copy-btn" onclick="copyExportCode()">📋 Copy to Clipboard</button>
+        </div>
+    </div>
+
+    <script>
+        // Gimmick Schema Definitions
+        const gimmickSchemas = {
+            RotatingBar: {
+                displayName: "회전 막대",
+                icon: "🔄",
+                difficulty: "easy",
+                fields: {
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "위치 (Z)" },
+                    width: { type: "number", min: 10, max: 50, default: 28, label: "너비" },
+                    height: { type: "number", min: 1, max: 10, default: 3, label: "높이" },
+                    speed: { type: "number", min: 0.5, max: 5, default: 1.5, label: "회전 속도", step: 0.1 }
+                }
+            },
+            JumpPad: {
+                displayName: "점프 패드",
+                icon: "🔺",
+                difficulty: "easy",
+                fields: {
+                    x: { type: "number", min: -20, max: 20, default: 0, label: "X 위치" },
+                    y: { type: "number", min: 0, max: 10, default: 0.5, label: "Y 위치", step: 0.5 },
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "Z 위치" }
+                }
+            },
+            SlimeZone: {
+                displayName: "슬라임 구역",
+                icon: "👻",
+                difficulty: "easy",
+                fields: {
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    length: { type: "number", min: 20, max: 200, default: 80, label: "길이" }
+                }
+            },
+            PunchingCorridor: {
+                displayName: "펀칭 복도",
+                icon: "🥊",
+                difficulty: "medium",
+                fields: {
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    length: { type: "number", min: 50, max: 200, default: 100, label: "길이" }
+                }
+            },
+            QuizGate: {
+                displayName: "퀴즈 게이트",
+                icon: "🚪",
+                difficulty: "medium",
+                fields: {
+                    id: { type: "number", min: 1, max: 100, default: 1, label: "게이트 ID" },
+                    triggerZ: { type: "number", min: 0, max: 2000, default: 150, label: "트리거 위치" },
+                    gateZ: { type: "number", min: 0, max: 2000, default: 180, label: "게이트 위치" },
+                    options: { type: "select", options: [2, 3, 4], default: 2, label: "선택지 수" }
+                }
+            },
+            Elevator: {
+                displayName: "엘리베이터",
+                icon: "🛗",
+                difficulty: "hard",
+                fields: {
+                    id: { type: "number", min: 1, max: 100, default: 1, label: "엘리베이터 ID" },
+                    triggerZ: { type: "number", min: 0, max: 2000, default: 620, label: "트리거 위치" },
+                    elevZ: { type: "number", min: 0, max: 2000, default: 670, label: "엘리베이터 위치" },
+                    options: { type: "select", options: [2, 3, 4], default: 3, label: "선택지 수" }
+                }
+            },
+            ConveyorBelt: {
+                displayName: "컨베이어 벨트",
+                icon: "⬅️",
+                difficulty: "medium",
+                fields: {
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    length: { type: "number", min: 20, max: 200, default: 60, label: "길이" },
+                    direction: { type: "select", options: [-1, 1], optionLabels: ["뒤로 (-1)", "앞으로 (1)"], default: -1, label: "방향" }
+                }
+            },
+            ElectricFloor: {
+                displayName: "전기 바닥",
+                icon: "⚡",
+                difficulty: "medium",
+                fields: {
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    length: { type: "number", min: 20, max: 200, default: 60, label: "길이" }
+                }
+            },
+            RollingBoulder: {
+                displayName: "굴러오는 바위",
+                icon: "🪨",
+                difficulty: "hard",
+                fields: {
+                    zStart: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    zEnd: { type: "number", min: 0, max: 2000, default: 200, label: "끝 위치 (Z)" }
+                }
+            },
+            DisappearingBridge: {
+                displayName: "사라지는 다리",
+                icon: "⏰",
+                difficulty: "hard",
+                fields: {
+                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    platformCount: { type: "number", min: 2, max: 20, default: 6, label: "플랫폼 수" }
+                }
+            }
+        };
+
+        // Course Data
+        let courseGimmicks = [];
+        let selectedGimmickIndex = -1;
+        let gimmickIdCounter = { QuizGate: 0, Elevator: 0 };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDragAndDrop();
+            updateTrackLength();
+            document.getElementById('courseLength').addEventListener('change', updateTrackLength);
+        });
+
+        function updateTrackLength() {
+            const length = document.getElementById('courseLength').value;
+            document.getElementById('trackLength').textContent = length;
+        }
+
+        function setupDragAndDrop() {
+            // Palette items
+            document.querySelectorAll('.gimmick-item').forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('gimmickType', item.dataset.type);
+                });
+            });
+
+            // Track view
+            const trackView = document.getElementById('trackView');
+            trackView.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                trackView.classList.add('drag-over');
+            });
+            trackView.addEventListener('dragleave', () => {
+                trackView.classList.remove('drag-over');
+            });
+            trackView.addEventListener('drop', (e) => {
+                e.preventDefault();
+                trackView.classList.remove('drag-over');
+                const type = e.dataTransfer.getData('gimmickType');
+                if (type) {
+                    addGimmick(type);
+                }
+            });
+        }
+
+        function addGimmick(type) {
+            const schema = gimmickSchemas[type];
+            if (!schema) return;
+
+            const gimmick = { type };
+
+            // Calculate next Z position
+            let nextZ = 50;
+            if (courseGimmicks.length > 0) {
+                const lastGimmick = courseGimmicks[courseGimmicks.length - 1];
+                const lastZ = getGimmickZ(lastGimmick);
+                nextZ = lastZ + 70;
+            }
+
+            // Set default values
+            for (const [key, field] of Object.entries(schema.fields)) {
+                if (key === 'z' || key === 'triggerZ' || key === 'zStart') {
+                    gimmick[key] = nextZ;
+                    if (key === 'triggerZ' && schema.fields.gateZ) {
+                        gimmick.gateZ = nextZ + 30;
+                    }
+                    if (key === 'triggerZ' && schema.fields.elevZ) {
+                        gimmick.elevZ = nextZ + 50;
+                    }
+                    if (key === 'zStart' && schema.fields.zEnd) {
+                        gimmick.zEnd = nextZ + 100;
+                    }
+                } else if (key === 'id') {
+                    gimmickIdCounter[type] = (gimmickIdCounter[type] || 0) + 1;
+                    gimmick[key] = gimmickIdCounter[type];
+                } else {
+                    gimmick[key] = field.default;
+                }
+            }
+
+            courseGimmicks.push(gimmick);
+            sortGimmicksByZ();
+            renderGimmickList();
+            selectGimmick(courseGimmicks.indexOf(gimmick));
+        }
+
+        function getGimmickZ(gimmick) {
+            return gimmick.z || gimmick.triggerZ || gimmick.zStart || 0;
+        }
+
+        function sortGimmicksByZ() {
+            courseGimmicks.sort((a, b) => getGimmickZ(a) - getGimmickZ(b));
+        }
+
+        function renderGimmickList() {
+            const container = document.getElementById('gimmickList');
+
+            if (courseGimmicks.length === 0) {
+                container.innerHTML = `
+                    <div class="track-empty">
+                        <div class="track-empty-icon">📦</div>
+                        <div>왼쪽에서 기믹을 드래그하여 추가하세요</div>
+                    </div>
+                `;
+                updateStats();
+                return;
+            }
+
+            container.innerHTML = courseGimmicks.map((gimmick, index) => {
+                const schema = gimmickSchemas[gimmick.type];
+                const z = getGimmickZ(gimmick);
+                const params = Object.entries(gimmick)
+                    .filter(([k, v]) => k !== 'type')
+                    .map(([k, v]) => `${k}:${v}`)
+                    .join(' | ');
+
+                return `
+                    <div class="gimmick-block ${schema.difficulty} ${selectedGimmickIndex === index ? 'selected' : ''}"
+                         onclick="selectGimmick(${index})">
+                        <div class="gimmick-block-icon">${schema.icon}</div>
+                        <div class="gimmick-block-info">
+                            <div class="gimmick-block-name">${schema.displayName}</div>
+                            <div class="gimmick-block-params">${params}</div>
+                        </div>
+                        <div class="gimmick-block-z">Z: ${z}</div>
+                        <div class="gimmick-block-actions">
+                            <button onclick="moveGimmick(${index}, -1); event.stopPropagation();">▲</button>
+                            <button onclick="moveGimmick(${index}, 1); event.stopPropagation();">▼</button>
+                            <button class="delete-btn" onclick="deleteGimmick(${index}); event.stopPropagation();">🗑</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('gimmickCount').textContent = courseGimmicks.length;
+            document.getElementById('quizCount').textContent = courseGimmicks.filter(g =>
+                g.type === 'QuizGate' || g.type === 'Elevator'
+            ).length;
+
+            if (courseGimmicks.length > 0) {
+                const maxZ = Math.max(...courseGimmicks.map(g => getGimmickZ(g)));
+                document.getElementById('lastZ').textContent = maxZ;
+            } else {
+                document.getElementById('lastZ').textContent = '0';
+            }
+        }
+
+        function selectGimmick(index) {
+            selectedGimmickIndex = index;
+            renderGimmickList();
+            renderProperties();
+        }
+
+        function renderProperties() {
+            const container = document.getElementById('propertiesContent');
+
+            if (selectedGimmickIndex < 0 || selectedGimmickIndex >= courseGimmicks.length) {
+                container.innerHTML = `
+                    <div class="properties-empty">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">👆</div>
+                        <div>기믹을 선택하여<br>속성을 편집하세요</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const gimmick = courseGimmicks[selectedGimmickIndex];
+            const schema = gimmickSchemas[gimmick.type];
+
+            let html = `
+                <div class="property-group">
+                    <div class="property-group-title">${schema.icon} ${schema.displayName}</div>
+                </div>
+                <div class="property-group">
+                    <div class="property-group-title">Parameters</div>
+            `;
+
+            for (const [key, field] of Object.entries(schema.fields)) {
+                const value = gimmick[key];
+
+                if (field.type === 'select') {
+                    const options = field.options.map((opt, i) => {
+                        const label = field.optionLabels ? field.optionLabels[i] : opt;
+                        return `<option value="${opt}" ${value == opt ? 'selected' : ''}>${label}</option>`;
+                    }).join('');
+
+                    html += `
+                        <div class="property-field">
+                            <label>${field.label}</label>
+                            <select onchange="updateGimmickProperty('${key}', this.value)">
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="property-field">
+                            <label>${field.label}</label>
+                            <div class="property-range">
+                                <input type="range"
+                                       min="${field.min}"
+                                       max="${field.max}"
+                                       step="${field.step || 1}"
+                                       value="${value}"
+                                       oninput="updateGimmickProperty('${key}', this.value); this.nextElementSibling.textContent = this.value;">
+                                <span class="value">${value}</span>
+                            </div>
+                            <div class="hint">범위: ${field.min} ~ ${field.max}</div>
+                        </div>
+                    `;
+                }
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function updateGimmickProperty(key, value) {
+            if (selectedGimmickIndex < 0) return;
+
+            const numValue = parseFloat(value);
+            courseGimmicks[selectedGimmickIndex][key] = isNaN(numValue) ? value : numValue;
+
+            sortGimmicksByZ();
+            const newIndex = courseGimmicks.findIndex(g => g === courseGimmicks[selectedGimmickIndex]);
+            selectedGimmickIndex = newIndex >= 0 ? newIndex : selectedGimmickIndex;
+
+            renderGimmickList();
+        }
+
+        function moveGimmick(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= courseGimmicks.length) return;
+
+            [courseGimmicks[index], courseGimmicks[newIndex]] = [courseGimmicks[newIndex], courseGimmicks[index]];
+
+            if (selectedGimmickIndex === index) {
+                selectedGimmickIndex = newIndex;
+            } else if (selectedGimmickIndex === newIndex) {
+                selectedGimmickIndex = index;
+            }
+
+            renderGimmickList();
+        }
+
+        function deleteGimmick(index) {
+            courseGimmicks.splice(index, 1);
+            if (selectedGimmickIndex >= courseGimmicks.length) {
+                selectedGimmickIndex = courseGimmicks.length - 1;
+            }
+            renderGimmickList();
+            renderProperties();
+        }
+
+        function newCourse() {
+            if (courseGimmicks.length > 0 && !confirm('현재 코스를 삭제하고 새로 만드시겠습니까?')) {
+                return;
+            }
+            courseGimmicks = [];
+            selectedGimmickIndex = -1;
+            gimmickIdCounter = { QuizGate: 0, Elevator: 0 };
+            document.getElementById('courseName').value = 'My Custom Course';
+            document.getElementById('courseAuthor').value = 'Anonymous';
+            renderGimmickList();
+            renderProperties();
+        }
+
+        function getCourseData() {
+            return {
+                metadata: {
+                    name: document.getElementById('courseName').value,
+                    author: document.getElementById('courseAuthor').value,
+                    version: "1.0",
+                    length: parseInt(document.getElementById('courseLength').value),
+                    difficulty: document.getElementById('courseDifficulty').value
+                },
+                gimmicks: courseGimmicks
+            };
+        }
+
+        function showExportModal() {
+            document.getElementById('exportModal').classList.add('active');
+            switchExportTab('lua');
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.remove('active');
+        }
+
+        let currentExportTab = 'lua';
+
+        function switchExportTab(tab) {
+            currentExportTab = tab;
+            document.querySelectorAll('.export-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.export-tab:nth-child(${tab === 'lua' ? 1 : 2})`).classList.add('active');
+
+            const data = getCourseData();
+            const codeElement = document.getElementById('exportCode');
+
+            if (tab === 'lua') {
+                codeElement.textContent = generateLuaCode(data);
+            } else {
+                codeElement.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+
+        function generateLuaCode(data) {
+            let lua = `-- ============================================
+-- 📋 CUSTOM COURSE DATA
+-- Generated by Quiz Castle Course Editor
+-- ============================================
+local CustomCourseData = {
+    metadata = {
+        name = "${data.metadata.name}",
+        author = "${data.metadata.author}",
+        version = "${data.metadata.version}",
+        length = ${data.metadata.length},
+        difficulty = "${data.metadata.difficulty}"
+    },
+    gimmicks = {\n`;
+
+            for (const gimmick of data.gimmicks) {
+                const params = Object.entries(gimmick)
+                    .map(([k, v]) => {
+                        if (k === 'type') return `type = "${v}"`;
+                        return `${k} = ${v}`;
+                    })
+                    .join(', ');
+                lua += `        {${params}},\n`;
+            }
+
+            lua += `    }
+}
+
+-- Usage: CourseEngine:BuildFromData(parent, CustomCourseData)
+return CustomCourseData`;
+
+            return lua;
+        }
+
+        function copyExportCode() {
+            const code = document.getElementById('exportCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('클립보드에 복사되었습니다!');
+            });
+        }
+
+        function loadFromJson() {
+            const input = prompt('JSON 데이터를 붙여넣으세요:');
+            if (!input) return;
+
+            try {
+                const data = JSON.parse(input);
+                if (data.metadata) {
+                    document.getElementById('courseName').value = data.metadata.name || 'Loaded Course';
+                    document.getElementById('courseAuthor').value = data.metadata.author || 'Unknown';
+                    document.getElementById('courseLength').value = data.metadata.length || 2000;
+                    document.getElementById('courseDifficulty').value = data.metadata.difficulty || 'medium';
+                    updateTrackLength();
+                }
+                if (data.gimmicks) {
+                    courseGimmicks = data.gimmicks;
+                    // Recalculate ID counters
+                    gimmickIdCounter = { QuizGate: 0, Elevator: 0 };
+                    courseGimmicks.forEach(g => {
+                        if (g.id && gimmickIdCounter[g.type] !== undefined) {
+                            gimmickIdCounter[g.type] = Math.max(gimmickIdCounter[g.type], g.id);
+                        }
+                    });
+                }
+                selectedGimmickIndex = -1;
+                renderGimmickList();
+                renderProperties();
+                alert('코스를 불러왔습니다!');
+            } catch (e) {
+                alert('JSON 파싱 오류: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
