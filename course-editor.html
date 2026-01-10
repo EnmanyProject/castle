@@ -993,7 +993,7 @@
                 icon: "🔄",
                 difficulty: "easy",
                 fields: {
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "위치 (Z)" },
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "위치 (Z)" },
                     width: { type: "number", min: 10, max: 50, default: 28, label: "너비" },
                     height: { type: "number", min: 1, max: 10, default: 3, label: "높이" },
                     speed: { type: "number", min: 0.5, max: 5, default: 1.5, label: "회전 속도", step: 0.1 }
@@ -1006,7 +1006,7 @@
                 fields: {
                     x: { type: "number", min: -20, max: 20, default: 0, label: "X 위치" },
                     y: { type: "number", min: 0, max: 10, default: 0.5, label: "Y 위치", step: 0.5 },
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "Z 위치" }
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "Z 위치" }
                 }
             },
             SlimeZone: {
@@ -1014,7 +1014,7 @@
                 icon: "👻",
                 difficulty: "easy",
                 fields: {
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "시작 위치 (Z)" },
                     length: { type: "number", min: 20, max: 200, default: 80, label: "길이" }
                 }
             },
@@ -1023,7 +1023,7 @@
                 icon: "🥊",
                 difficulty: "medium",
                 fields: {
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "시작 위치 (Z)" },
                     length: { type: "number", min: 50, max: 200, default: 100, label: "길이" }
                 }
             },
@@ -1033,8 +1033,8 @@
                 difficulty: "medium",
                 fields: {
                     id: { type: "number", min: 1, max: 100, default: 1, label: "게이트 ID" },
-                    triggerZ: { type: "number", min: 0, max: 2000, default: 150, label: "트리거 위치" },
-                    gateZ: { type: "number", min: 0, max: 2000, default: 180, label: "게이트 위치" },
+                    triggerZ: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 150, label: "트리거 위치" },
+                    gateZ: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 180, label: "게이트 위치" },
                     options: { type: "select", options: [2, 3, 4], default: 2, label: "선택지 수" }
                 }
             },
@@ -1044,8 +1044,8 @@
                 difficulty: "hard",
                 fields: {
                     id: { type: "number", min: 1, max: 100, default: 1, label: "엘리베이터 ID" },
-                    triggerZ: { type: "number", min: 0, max: 2000, default: 620, label: "트리거 위치" },
-                    elevZ: { type: "number", min: 0, max: 2000, default: 670, label: "엘리베이터 위치" },
+                    triggerZ: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 620, label: "트리거 위치" },
+                    elevZ: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 670, label: "엘리베이터 위치" },
                     options: { type: "select", options: [2, 3, 4], default: 3, label: "선택지 수" }
                 }
             },
@@ -1054,7 +1054,7 @@
                 icon: "⬅️",
                 difficulty: "medium",
                 fields: {
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "시작 위치 (Z)" },
                     length: { type: "number", min: 20, max: 200, default: 60, label: "길이" },
                     direction: { type: "select", options: [-1, 1], optionLabels: ["뒤로 (-1)", "앞으로 (1)"], default: -1, label: "방향" }
                 }
@@ -1064,7 +1064,7 @@
                 icon: "⚡",
                 difficulty: "medium",
                 fields: {
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "시작 위치 (Z)" },
                     length: { type: "number", min: 20, max: 200, default: 60, label: "길이" }
                 }
             },
@@ -1073,8 +1073,8 @@
                 icon: "🪨",
                 difficulty: "hard",
                 fields: {
-                    zStart: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
-                    zEnd: { type: "number", min: 0, max: 2000, default: 200, label: "끝 위치 (Z)" }
+                    zStart: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "시작 위치 (Z)" },
+                    zEnd: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 200, label: "끝 위치 (Z)" }
                 }
             },
             DisappearingBridge: {
@@ -1082,7 +1082,7 @@
                 icon: "⏰",
                 difficulty: "hard",
                 fields: {
-                    z: { type: "number", min: 0, max: 2000, default: 100, label: "시작 위치 (Z)" },
+                    z: { type: "number", min: 0, max: 2000, maxKey: "courseLength", default: 100, label: "시작 위치 (Z)" },
                     platformCount: { type: "number", min: 2, max: 20, default: 6, label: "플랫폼 수" }
                 }
             }
@@ -1096,13 +1096,61 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             setupDragAndDrop();
+            // Initialize schema max values with default course length
+            updateSchemaMaxValues(getCourseLength());
             updateTrackLength();
+            // Listen for course length changes (both change and input for real-time)
             document.getElementById('courseLength').addEventListener('change', updateTrackLength);
+            document.getElementById('courseLength').addEventListener('input', updateTrackLength);
         });
 
+        function getCourseLength() {
+            return parseInt(document.getElementById('courseLength').value) || 2000;
+        }
+
         function updateTrackLength() {
-            const length = document.getElementById('courseLength').value;
+            const length = getCourseLength();
             document.getElementById('trackLength').textContent = length;
+
+            // Update all gimmick schemas with new max Z
+            updateSchemaMaxValues(length);
+
+            // Validate and adjust existing gimmicks if they exceed new length
+            let adjusted = false;
+            courseGimmicks.forEach(gimmick => {
+                const schema = gimmickSchemas[gimmick.type];
+                if (!schema) return;
+
+                for (const [key, field] of Object.entries(schema.fields)) {
+                    if (field.type === 'number' && field.maxKey === 'courseLength') {
+                        if (gimmick[key] > length) {
+                            gimmick[key] = length - 50;
+                            adjusted = true;
+                        }
+                    }
+                }
+            });
+
+            if (adjusted) {
+                sortGimmicksByZ();
+                renderGimmickList();
+            }
+
+            // Re-render properties panel if a gimmick is selected
+            if (selectedGimmickIndex >= 0) {
+                renderProperties();
+            }
+        }
+
+        function updateSchemaMaxValues(courseLength) {
+            // Update max Z values in all schemas that use course length
+            for (const [typeName, schema] of Object.entries(gimmickSchemas)) {
+                for (const [fieldName, field] of Object.entries(schema.fields)) {
+                    if (field.maxKey === 'courseLength') {
+                        field.max = courseLength;
+                    }
+                }
+            }
         }
 
         function setupDragAndDrop() {
