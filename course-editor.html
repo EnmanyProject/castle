@@ -1115,26 +1115,42 @@
             // Update all gimmick schemas with new max Z
             updateSchemaMaxValues(length);
 
-            // Validate and adjust existing gimmicks if they exceed new length
-            let adjusted = false;
-            courseGimmicks.forEach(gimmick => {
+            // Check if any gimmicks exceed new length and warn
+            const exceedingGimmicks = [];
+            courseGimmicks.forEach((gimmick, index) => {
                 const schema = gimmickSchemas[gimmick.type];
                 if (!schema) return;
 
                 for (const [key, field] of Object.entries(schema.fields)) {
                     if (field.type === 'number' && field.maxKey === 'courseLength') {
                         if (gimmick[key] > length) {
-                            gimmick[key] = length - 50;
-                            adjusted = true;
+                            exceedingGimmicks.push({
+                                index: index + 1,
+                                type: schema.displayName,
+                                field: field.label,
+                                value: gimmick[key]
+                            });
                         }
                     }
                 }
             });
 
-            if (adjusted) {
-                sortGimmicksByZ();
-                renderGimmickList();
+            if (exceedingGimmicks.length > 0) {
+                const gimmickList = exceedingGimmicks.slice(0, 5).map(g =>
+                    `  #${g.index} ${g.type}: ${g.field} = ${g.value}`
+                ).join('\n');
+
+                const moreText = exceedingGimmicks.length > 5
+                    ? `\n  ... 외 ${exceedingGimmicks.length - 5}개`
+                    : '';
+
+                showWarning(`코스 길이(${length})를 초과하는 기믹이 있습니다!\n\n` +
+                    `${gimmickList}${moreText}\n\n` +
+                    `해당 기믹의 위치를 수정하거나 삭제하세요.`);
             }
+
+            // Re-render list to show which ones are out of bounds
+            renderGimmickList();
 
             // Re-render properties panel if a gimmick is selected
             if (selectedGimmickIndex >= 0) {
@@ -1184,7 +1200,7 @@
             const schema = gimmickSchemas[type];
             if (!schema) return;
 
-            const gimmick = { type };
+            const courseLength = getCourseLength();
 
             // Calculate next Z position
             let nextZ = 50;
@@ -1193,6 +1209,32 @@
                 const lastZ = getGimmickZ(lastGimmick);
                 nextZ = lastZ + 70;
             }
+
+            // Calculate the maximum Z this gimmick would use
+            let maxZNeeded = nextZ;
+            if (schema.fields.gateZ) {
+                maxZNeeded = Math.max(maxZNeeded, nextZ + 30);
+            }
+            if (schema.fields.elevZ) {
+                maxZNeeded = Math.max(maxZNeeded, nextZ + 50);
+            }
+            if (schema.fields.zEnd) {
+                maxZNeeded = Math.max(maxZNeeded, nextZ + 100);
+            }
+            if (schema.fields.length) {
+                maxZNeeded = Math.max(maxZNeeded, nextZ + (schema.fields.length.default || 60));
+            }
+
+            // Check if gimmick would exceed course length
+            if (maxZNeeded > courseLength) {
+                showWarning(`기믹을 추가할 수 없습니다!\n\n` +
+                    `필요한 위치: Z ${nextZ} ~ ${maxZNeeded}\n` +
+                    `코스 길이: ${courseLength}\n\n` +
+                    `코스 길이를 늘리거나 기존 기믹을 삭제하세요.`);
+                return;
+            }
+
+            const gimmick = { type };
 
             // Set default values - process in specific order to avoid overwrites
             // First, set all defaults
@@ -1230,12 +1272,42 @@
             selectGimmick(courseGimmicks.indexOf(gimmick));
         }
 
+        function showWarning(message) {
+            // Create warning modal
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay active';
+            overlay.style.zIndex = '2000';
+            overlay.innerHTML = `
+                <div class="modal" style="max-width: 400px; text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
+                    <div style="white-space: pre-line; margin-bottom: 20px; line-height: 1.6;">${message}</div>
+                    <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">확인</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
         function getGimmickZ(gimmick) {
             return gimmick.z || gimmick.triggerZ || gimmick.zStart || 0;
         }
 
         function sortGimmicksByZ() {
             courseGimmicks.sort((a, b) => getGimmickZ(a) - getGimmickZ(b));
+        }
+
+        function isGimmickExceedingLength(gimmick) {
+            const courseLength = getCourseLength();
+            const schema = gimmickSchemas[gimmick.type];
+            if (!schema) return false;
+
+            for (const [key, field] of Object.entries(schema.fields)) {
+                if (field.type === 'number' && field.maxKey === 'courseLength') {
+                    if (gimmick[key] > courseLength) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         function renderGimmickList() {
@@ -1255,20 +1327,27 @@
             container.innerHTML = courseGimmicks.map((gimmick, index) => {
                 const schema = gimmickSchemas[gimmick.type];
                 const z = getGimmickZ(gimmick);
+                const exceeds = isGimmickExceedingLength(gimmick);
                 const params = Object.entries(gimmick)
                     .filter(([k, v]) => k !== 'type')
                     .map(([k, v]) => `${k}:${v}`)
                     .join(' | ');
 
+                const exceedStyle = exceeds
+                    ? 'background: rgba(255, 0, 0, 0.2); border-left-color: #ff0000 !important;'
+                    : '';
+                const exceedIcon = exceeds ? '⚠️ ' : '';
+
                 return `
                     <div class="gimmick-block ${schema.difficulty} ${selectedGimmickIndex === index ? 'selected' : ''}"
+                         style="${exceedStyle}"
                          onclick="selectGimmick(${index})">
-                        <div class="gimmick-block-icon">${schema.icon}</div>
+                        <div class="gimmick-block-icon">${exceedIcon}${schema.icon}</div>
                         <div class="gimmick-block-info">
-                            <div class="gimmick-block-name">${schema.displayName}</div>
+                            <div class="gimmick-block-name">${schema.displayName}${exceeds ? ' (범위 초과!)' : ''}</div>
                             <div class="gimmick-block-params">${params}</div>
                         </div>
-                        <div class="gimmick-block-z">Z: ${z}</div>
+                        <div class="gimmick-block-z" style="${exceeds ? 'color: #ff4444; font-weight: bold;' : ''}">Z: ${z}</div>
                         <div class="gimmick-block-actions">
                             <button onclick="moveGimmick(${index}, -1); event.stopPropagation();">▲</button>
                             <button onclick="moveGimmick(${index}, 1); event.stopPropagation();">▼</button>
