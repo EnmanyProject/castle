@@ -59,6 +59,7 @@ local Events = {
     XPUpdate = remoteFolder:WaitForChild("XPUpdate"),
     LevelUp = remoteFolder:WaitForChild("LevelUp"),
     TrailUpdate = remoteFolder:WaitForChild("TrailUpdate"),
+    AdminCommand = remoteFolder:WaitForChild("AdminCommand"),
 }
 
 print("🎮 Quiz Castle v3.2 Client Loading...")
@@ -1129,6 +1130,380 @@ Events.RoundUpdate.OnClientEvent:Connect(function(eventType, data)
 end)
 
 -- ============================================
+-- 🔧 ADMIN PANEL UI
+-- ============================================
+local AdminPanel = {
+    visible = false,
+    courses = {},
+    currentCourse = nil
+}
+
+-- Admin Panel GUI
+local adminScreenGui = Instance.new("ScreenGui")
+adminScreenGui.Name = "AdminPanel"
+adminScreenGui.ResetOnSpawn = false
+adminScreenGui.DisplayOrder = 100
+adminScreenGui.Parent = playerGui
+
+-- Main Panel Frame
+local adminFrame = Instance.new("Frame")
+adminFrame.Name = "AdminFrame"
+adminFrame.Size = UDim2.new(0, 400, 0, 500)
+adminFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+adminFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+adminFrame.BackgroundTransparency = 0.1
+adminFrame.BorderSizePixel = 0
+adminFrame.Visible = false
+adminFrame.Parent = adminScreenGui
+
+local adminCorner = Instance.new("UICorner")
+adminCorner.CornerRadius = UDim.new(0, 12)
+adminCorner.Parent = adminFrame
+
+local adminStroke = Instance.new("UIStroke")
+adminStroke.Color = Color3.fromRGB(100, 100, 180)
+adminStroke.Thickness = 2
+adminStroke.Parent = adminFrame
+
+-- Header
+local adminHeader = Instance.new("Frame")
+adminHeader.Name = "Header"
+adminHeader.Size = UDim2.new(1, 0, 0, 50)
+adminHeader.BackgroundColor3 = Color3.fromRGB(40, 40, 80)
+adminHeader.BorderSizePixel = 0
+adminHeader.Parent = adminFrame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 12)
+headerCorner.Parent = adminHeader
+
+-- Fix bottom corners of header
+local headerFix = Instance.new("Frame")
+headerFix.Size = UDim2.new(1, 0, 0, 12)
+headerFix.Position = UDim2.new(0, 0, 1, -12)
+headerFix.BackgroundColor3 = Color3.fromRGB(40, 40, 80)
+headerFix.BorderSizePixel = 0
+headerFix.Parent = adminHeader
+
+local adminTitle = Instance.new("TextLabel")
+adminTitle.Size = UDim2.new(1, -50, 1, 0)
+adminTitle.Position = UDim2.new(0, 15, 0, 0)
+adminTitle.BackgroundTransparency = 1
+adminTitle.Text = "🔧 Admin Panel"
+adminTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+adminTitle.TextSize = 20
+adminTitle.Font = Enum.Font.GothamBold
+adminTitle.TextXAlignment = Enum.TextXAlignment.Left
+adminTitle.Parent = adminHeader
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 40, 0, 40)
+closeBtn.Position = UDim2.new(1, -45, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+closeBtn.Text = "×"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 24
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = adminHeader
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(0, 8)
+closeBtnCorner.Parent = closeBtn
+
+-- Content Area
+local contentFrame = Instance.new("ScrollingFrame")
+contentFrame.Name = "Content"
+contentFrame.Size = UDim2.new(1, -20, 1, -60)
+contentFrame.Position = UDim2.new(0, 10, 0, 55)
+contentFrame.BackgroundTransparency = 1
+contentFrame.ScrollBarThickness = 6
+contentFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 180)
+contentFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
+contentFrame.Parent = adminFrame
+
+local contentLayout = Instance.new("UIListLayout")
+contentLayout.Padding = UDim.new(0, 8)
+contentLayout.Parent = contentFrame
+
+-- Helper function to create section
+local function CreateSection(title)
+    local section = Instance.new("Frame")
+    section.Size = UDim2.new(1, 0, 0, 40)
+    section.BackgroundColor3 = Color3.fromRGB(50, 50, 90)
+    section.BorderSizePixel = 0
+    section.Parent = contentFrame
+
+    local sectionCorner = Instance.new("UICorner")
+    sectionCorner.CornerRadius = UDim.new(0, 8)
+    sectionCorner.Parent = section
+
+    local sectionTitle = Instance.new("TextLabel")
+    sectionTitle.Size = UDim2.new(1, -20, 1, 0)
+    sectionTitle.Position = UDim2.new(0, 10, 0, 0)
+    sectionTitle.BackgroundTransparency = 1
+    sectionTitle.Text = title
+    sectionTitle.TextColor3 = Color3.fromRGB(150, 200, 255)
+    sectionTitle.TextSize = 14
+    sectionTitle.Font = Enum.Font.GothamBold
+    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+    sectionTitle.Parent = section
+
+    return section
+end
+
+-- Helper function to create button
+local function CreateButton(text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 120)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamMedium
+    btn.Parent = contentFrame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = btn
+
+    btn.MouseButton1Click:Connect(callback)
+
+    return btn
+end
+
+-- Helper function to create info label
+local function CreateInfoLabel(text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 30)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(180, 180, 180)
+    label.TextSize = 12
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextWrapped = true
+    label.Parent = contentFrame
+    return label
+end
+
+-- Current Course Info Label
+local courseInfoLabel = CreateInfoLabel("📋 현재 코스: 로딩 중...")
+
+-- Section: Course Management
+CreateSection("📚 코스 관리")
+
+CreateButton("📋 코스 목록 보기", Color3.fromRGB(60, 120, 180), function()
+    Events.AdminCommand:FireServer("courses")
+end)
+
+CreateButton("🔄 코스 재빌드", Color3.fromRGB(180, 120, 60), function()
+    Events.AdminCommand:FireServer("rebuild")
+end)
+
+CreateButton("ℹ️ 현재 코스 정보", Color3.fromRGB(60, 150, 120), function()
+    Events.AdminCommand:FireServer("courseinfo")
+end)
+
+-- Section: Course List
+CreateSection("🎮 코스 선택")
+
+local courseListFrame = Instance.new("Frame")
+courseListFrame.Name = "CourseList"
+courseListFrame.Size = UDim2.new(1, 0, 0, 150)
+courseListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+courseListFrame.BorderSizePixel = 0
+courseListFrame.Parent = contentFrame
+
+local courseListCorner = Instance.new("UICorner")
+courseListCorner.CornerRadius = UDim.new(0, 8)
+courseListCorner.Parent = courseListFrame
+
+local courseListScroll = Instance.new("ScrollingFrame")
+courseListScroll.Size = UDim2.new(1, -10, 1, -10)
+courseListScroll.Position = UDim2.new(0, 5, 0, 5)
+courseListScroll.BackgroundTransparency = 1
+courseListScroll.ScrollBarThickness = 4
+courseListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+courseListScroll.Parent = courseListFrame
+
+local courseListLayout = Instance.new("UIListLayout")
+courseListLayout.Padding = UDim.new(0, 5)
+courseListLayout.Parent = courseListScroll
+
+local courseListPlaceholder = Instance.new("TextLabel")
+courseListPlaceholder.Name = "Placeholder"
+courseListPlaceholder.Size = UDim2.new(1, 0, 0, 30)
+courseListPlaceholder.BackgroundTransparency = 1
+courseListPlaceholder.Text = "📋 '코스 목록 보기' 클릭하세요"
+courseListPlaceholder.TextColor3 = Color3.fromRGB(120, 120, 120)
+courseListPlaceholder.TextSize = 12
+courseListPlaceholder.Font = Enum.Font.Gotham
+courseListPlaceholder.Parent = courseListScroll
+
+-- Section: GitHub Load
+CreateSection("🌐 GitHub 코스 로드")
+
+local githubInput = Instance.new("TextBox")
+githubInput.Size = UDim2.new(1, 0, 0, 35)
+githubInput.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+githubInput.Text = ""
+githubInput.PlaceholderText = "코스 ID 입력 (예: sample-easy)"
+githubInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+githubInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+githubInput.TextSize = 14
+githubInput.Font = Enum.Font.Gotham
+githubInput.ClearTextOnFocus = false
+githubInput.Parent = contentFrame
+
+local githubInputCorner = Instance.new("UICorner")
+githubInputCorner.CornerRadius = UDim.new(0, 8)
+githubInputCorner.Parent = githubInput
+
+CreateButton("🌐 GitHub에서 로드", Color3.fromRGB(100, 60, 180), function()
+    local courseId = githubInput.Text
+    if courseId and courseId ~= "" then
+        Events.AdminCommand:FireServer("loadgithub", courseId)
+        githubInput.Text = ""
+    end
+end)
+
+-- Section: Quick Actions
+CreateSection("⚡ 빠른 작업")
+
+CreateButton("🏠 클래식 코스로 변경", Color3.fromRGB(60, 120, 60), function()
+    Events.AdminCommand:FireServer("setcourse", "classic", "library")
+end)
+
+CreateButton("🔥 하드모드 코스로 변경", Color3.fromRGB(180, 60, 60), function()
+    Events.AdminCommand:FireServer("setcourse", "hardmode", "library")
+end)
+
+-- Status Label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "StatusLabel"
+statusLabel.Size = UDim2.new(1, 0, 0, 50)
+statusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+statusLabel.Text = ""
+statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+statusLabel.TextSize = 12
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextWrapped = true
+statusLabel.Visible = false
+statusLabel.Parent = contentFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 8)
+statusCorner.Parent = statusLabel
+
+-- Update canvas size
+contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, contentLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- Toggle admin panel
+local function ToggleAdminPanel()
+    AdminPanel.visible = not AdminPanel.visible
+    adminFrame.Visible = AdminPanel.visible
+
+    if AdminPanel.visible then
+        -- Request course info when opening
+        Events.AdminCommand:FireServer("courseinfo")
+    end
+end
+
+-- Close button
+closeBtn.MouseButton1Click:Connect(function()
+    AdminPanel.visible = false
+    adminFrame.Visible = false
+end)
+
+-- Show status message
+local function ShowStatus(message, isError)
+    statusLabel.Text = message
+    statusLabel.TextColor3 = isError and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 255, 100)
+    statusLabel.Visible = true
+
+    task.delay(5, function()
+        statusLabel.Visible = false
+    end)
+end
+
+-- Update course list UI
+local function UpdateCourseListUI(courses)
+    -- Clear existing items
+    for _, child in ipairs(courseListScroll:GetChildren()) do
+        if child:IsA("TextButton") or (child:IsA("TextLabel") and child.Name == "Placeholder") then
+            child:Destroy()
+        end
+    end
+
+    if #courses == 0 then
+        local placeholder = Instance.new("TextLabel")
+        placeholder.Name = "Placeholder"
+        placeholder.Size = UDim2.new(1, 0, 0, 30)
+        placeholder.BackgroundTransparency = 1
+        placeholder.Text = "코스가 없습니다"
+        placeholder.TextColor3 = Color3.fromRGB(120, 120, 120)
+        placeholder.TextSize = 12
+        placeholder.Font = Enum.Font.Gotham
+        placeholder.Parent = courseListScroll
+        return
+    end
+
+    for _, course in ipairs(courses) do
+        local courseBtn = Instance.new("TextButton")
+        courseBtn.Size = UDim2.new(1, -10, 0, 35)
+        courseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 90)
+        courseBtn.Text = string.format("  %s (%s)", course.name, course.difficulty)
+        courseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        courseBtn.TextSize = 12
+        courseBtn.Font = Enum.Font.Gotham
+        courseBtn.TextXAlignment = Enum.TextXAlignment.Left
+        courseBtn.Parent = courseListScroll
+
+        local courseBtnCorner = Instance.new("UICorner")
+        courseBtnCorner.CornerRadius = UDim.new(0, 6)
+        courseBtnCorner.Parent = courseBtn
+
+        courseBtn.MouseButton1Click:Connect(function()
+            Events.AdminCommand:FireServer("setcourse", course.id, "library")
+        end)
+
+        -- Hover effect
+        courseBtn.MouseEnter:Connect(function()
+            courseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 120)
+        end)
+        courseBtn.MouseLeave:Connect(function()
+            courseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 90)
+        end)
+    end
+
+    -- Update canvas size
+    courseListScroll.CanvasSize = UDim2.new(0, 0, 0, #courses * 40)
+end
+
+-- Handle admin command responses
+Events.AdminCommand.OnClientEvent:Connect(function(action, data)
+    if action == "CourseList" then
+        AdminPanel.courses = data
+        UpdateCourseListUI(data)
+        ShowStatus(string.format("📚 %d개의 코스를 찾았습니다", #data))
+
+    elseif action == "CourseInfo" then
+        AdminPanel.currentCourse = data
+        courseInfoLabel.Text = string.format("📋 현재 코스: %s (by %s) - %d 기믹",
+            data.name, data.author, data.gimmickCount)
+
+    elseif action == "Success" then
+        ShowStatus("✅ " .. data)
+        Events.AdminCommand:FireServer("courseinfo")  -- Refresh course info
+
+    elseif action == "Error" then
+        ShowStatus("❌ " .. data, true)
+    end
+end)
+
+-- ============================================
 -- ⌨️ INPUT HANDLING
 -- ============================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -1139,6 +1514,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if PlayerState.currentItem then
             Events.UseItem:FireServer(PlayerState.currentItem)
         end
+    end
+
+    -- F7: Toggle Admin Panel
+    if input.KeyCode == Enum.KeyCode.F7 then
+        ToggleAdminPanel()
     end
 end)
 
