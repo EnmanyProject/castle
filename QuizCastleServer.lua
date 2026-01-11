@@ -2559,7 +2559,7 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
         end
 
     elseif command == "courseinfo" then
-        -- 현재 코스 정보
+        -- 현재 코스 정보 (미리보기용 기믹 데이터 포함)
         local course = CourseManager:GetCurrentCourse()
         if course then
             local info = {
@@ -2567,7 +2567,8 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
                 author = course.metadata.author,
                 difficulty = course.metadata.difficulty,
                 length = course.metadata.length,
-                gimmickCount = #course.gimmicks
+                gimmickCount = #course.gimmicks,
+                gimmicks = course.gimmicks  -- 미리보기용 전체 기믹 데이터
             }
             Events.AdminCommand:FireClient(player, "CourseInfo", info)
             print(string.format("📋 Current Course: %s by %s (%d gimmicks)",

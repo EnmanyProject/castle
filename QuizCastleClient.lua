@@ -1289,6 +1289,224 @@ end
 -- Current Course Info Label
 local courseInfoLabel = CreateInfoLabel("📋 현재 코스: 로딩 중...")
 
+-- Section: Course Preview
+CreateSection("👁️ 코스 미리보기")
+
+-- Preview Frame
+local previewFrame = Instance.new("Frame")
+previewFrame.Name = "PreviewFrame"
+previewFrame.Size = UDim2.new(1, 0, 0, 120)
+previewFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+previewFrame.BorderSizePixel = 0
+previewFrame.Parent = contentFrame
+
+local previewCorner = Instance.new("UICorner")
+previewCorner.CornerRadius = UDim.new(0, 8)
+previewCorner.Parent = previewFrame
+
+-- Track background
+local trackBg = Instance.new("Frame")
+trackBg.Name = "TrackBg"
+trackBg.Size = UDim2.new(1, -20, 0, 40)
+trackBg.Position = UDim2.new(0, 10, 0.5, -20)
+trackBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+trackBg.BorderSizePixel = 0
+trackBg.Parent = previewFrame
+
+local trackBgCorner = Instance.new("UICorner")
+trackBgCorner.CornerRadius = UDim.new(0, 4)
+trackBgCorner.Parent = trackBg
+
+-- Start marker
+local startMarker = Instance.new("Frame")
+startMarker.Size = UDim2.new(0, 4, 1, 0)
+startMarker.Position = UDim2.new(0, 0, 0, 0)
+startMarker.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
+startMarker.BorderSizePixel = 0
+startMarker.Parent = trackBg
+
+-- Finish marker
+local finishMarker = Instance.new("Frame")
+finishMarker.Size = UDim2.new(0, 4, 1, 0)
+finishMarker.Position = UDim2.new(1, -4, 0, 0)
+finishMarker.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+finishMarker.BorderSizePixel = 0
+finishMarker.Parent = trackBg
+
+-- Gimmick container
+local gimmickContainer = Instance.new("Frame")
+gimmickContainer.Name = "GimmickContainer"
+gimmickContainer.Size = UDim2.new(1, 0, 1, 0)
+gimmickContainer.BackgroundTransparency = 1
+gimmickContainer.Parent = trackBg
+
+-- Preview labels
+local previewStartLabel = Instance.new("TextLabel")
+previewStartLabel.Size = UDim2.new(0, 40, 0, 15)
+previewStartLabel.Position = UDim2.new(0, 10, 0, 5)
+previewStartLabel.BackgroundTransparency = 1
+previewStartLabel.Text = "START"
+previewStartLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+previewStartLabel.TextSize = 10
+previewStartLabel.Font = Enum.Font.GothamBold
+previewStartLabel.Parent = previewFrame
+
+local previewEndLabel = Instance.new("TextLabel")
+previewEndLabel.Size = UDim2.new(0, 40, 0, 15)
+previewEndLabel.Position = UDim2.new(1, -50, 0, 5)
+previewEndLabel.BackgroundTransparency = 1
+previewEndLabel.Text = "FINISH"
+previewEndLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+previewEndLabel.TextSize = 10
+previewEndLabel.Font = Enum.Font.GothamBold
+previewEndLabel.Parent = previewFrame
+
+-- Legend
+local legendFrame = Instance.new("Frame")
+legendFrame.Size = UDim2.new(1, -20, 0, 20)
+legendFrame.Position = UDim2.new(0, 10, 1, -25)
+legendFrame.BackgroundTransparency = 1
+legendFrame.Parent = previewFrame
+
+local legendLayout = Instance.new("UIListLayout")
+legendLayout.FillDirection = Enum.FillDirection.Horizontal
+legendLayout.Padding = UDim.new(0, 10)
+legendLayout.Parent = legendFrame
+
+-- Gimmick colors and icons for preview
+local GimmickPreviewConfig = {
+    RotatingBar = {color = Color3.fromRGB(255, 100, 100), icon = "🔄"},
+    QuizGate = {color = Color3.fromRGB(100, 200, 255), icon = "❓"},
+    Elevator = {color = Color3.fromRGB(255, 200, 100), icon = "🛗"},
+    JumpPad = {color = Color3.fromRGB(100, 255, 150), icon = "⬆️"},
+    SlimeZone = {color = Color3.fromRGB(150, 255, 100), icon = "💚"},
+    DisappearingBridge = {color = Color3.fromRGB(200, 150, 255), icon = "🌉"},
+    ConveyorBelt = {color = Color3.fromRGB(150, 150, 150), icon = "➡️"},
+    ElectricFloor = {color = Color3.fromRGB(255, 255, 100), icon = "⚡"},
+    PunchingCorridor = {color = Color3.fromRGB(255, 150, 100), icon = "👊"},
+    RollingBoulder = {color = Color3.fromRGB(139, 90, 43), icon = "🪨"}
+}
+
+-- Create legend items
+local function CreateLegendItem(gimmickType, config)
+    local item = Instance.new("Frame")
+    item.Size = UDim2.new(0, 50, 1, 0)
+    item.BackgroundTransparency = 1
+    item.Parent = legendFrame
+
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 8, 0, 8)
+    dot.Position = UDim2.new(0, 0, 0.5, -4)
+    dot.BackgroundColor3 = config.color
+    dot.BorderSizePixel = 0
+    dot.Parent = item
+
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = dot
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -12, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = config.icon
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 10
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = item
+end
+
+-- Add some legend items
+CreateLegendItem("QuizGate", GimmickPreviewConfig.QuizGate)
+CreateLegendItem("RotatingBar", GimmickPreviewConfig.RotatingBar)
+CreateLegendItem("Elevator", GimmickPreviewConfig.Elevator)
+CreateLegendItem("JumpPad", GimmickPreviewConfig.JumpPad)
+
+-- Function to render preview
+local function RenderCoursePreview(courseData)
+    -- Clear existing gimmicks
+    for _, child in ipairs(gimmickContainer:GetChildren()) do
+        child:Destroy()
+    end
+
+    if not courseData or not courseData.gimmicks then
+        return
+    end
+
+    local trackLength = courseData.length or 2000
+    local trackWidth = trackBg.AbsoluteSize.X - 10
+
+    for _, gimmick in ipairs(courseData.gimmicks) do
+        local config = GimmickPreviewConfig[gimmick.type]
+        if config then
+            -- Get Z position
+            local z = gimmick.z or gimmick.triggerZ or gimmick.zStart or 0
+            local zEnd = gimmick.gateZ or gimmick.elevZ or gimmick.zEnd or z
+            local zLength = gimmick.length or 0
+
+            -- Calculate position on track
+            local xPos = (z / trackLength)
+            local width = math.max(4, ((zEnd - z + zLength) / trackLength) * trackWidth)
+
+            -- Create gimmick marker
+            local marker = Instance.new("Frame")
+            marker.Size = UDim2.new(0, math.max(4, width), 0.6, 0)
+            marker.Position = UDim2.new(xPos, 0, 0.2, 0)
+            marker.BackgroundColor3 = config.color
+            marker.BorderSizePixel = 0
+            marker.Parent = gimmickContainer
+
+            local markerCorner = Instance.new("UICorner")
+            markerCorner.CornerRadius = UDim.new(0, 2)
+            markerCorner.Parent = marker
+
+            -- Tooltip on hover (using TextLabel as tooltip container)
+            local tooltip = Instance.new("TextLabel")
+            tooltip.Size = UDim2.new(0, 80, 0, 20)
+            tooltip.Position = UDim2.new(0.5, -40, -1.5, 0)
+            tooltip.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+            tooltip.Text = string.format("%s Z:%d", config.icon, z)
+            tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+            tooltip.TextSize = 9
+            tooltip.Font = Enum.Font.Gotham
+            tooltip.Visible = false
+            tooltip.ZIndex = 10
+            tooltip.Parent = marker
+
+            local tooltipCorner = Instance.new("UICorner")
+            tooltipCorner.CornerRadius = UDim.new(0, 4)
+            tooltipCorner.Parent = tooltip
+
+            -- Create invisible button for hover detection
+            local hoverBtn = Instance.new("TextButton")
+            hoverBtn.Size = UDim2.new(1, 0, 1, 0)
+            hoverBtn.BackgroundTransparency = 1
+            hoverBtn.Text = ""
+            hoverBtn.Parent = marker
+
+            hoverBtn.MouseEnter:Connect(function()
+                tooltip.Visible = true
+            end)
+            hoverBtn.MouseLeave:Connect(function()
+                tooltip.Visible = false
+            end)
+        end
+    end
+end
+
+-- Preview placeholder text
+local previewPlaceholder = Instance.new("TextLabel")
+previewPlaceholder.Name = "PreviewPlaceholder"
+previewPlaceholder.Size = UDim2.new(1, 0, 0, 20)
+previewPlaceholder.Position = UDim2.new(0, 0, 0.5, -10)
+previewPlaceholder.BackgroundTransparency = 1
+previewPlaceholder.Text = "코스 정보를 로드하면 미리보기가 표시됩니다"
+previewPlaceholder.TextColor3 = Color3.fromRGB(100, 100, 120)
+previewPlaceholder.TextSize = 11
+previewPlaceholder.Font = Enum.Font.Gotham
+previewPlaceholder.Parent = gimmickContainer
+
 -- Section: Course Management
 CreateSection("📚 코스 관리")
 
@@ -1493,6 +1711,15 @@ Events.AdminCommand.OnClientEvent:Connect(function(action, data)
         AdminPanel.currentCourse = data
         courseInfoLabel.Text = string.format("📋 현재 코스: %s (by %s) - %d 기믹",
             data.name, data.author, data.gimmickCount)
+
+        -- Render course preview
+        if data.gimmicks and #data.gimmicks > 0 then
+            previewPlaceholder.Visible = false
+            RenderCoursePreview(data)
+        else
+            previewPlaceholder.Visible = true
+            previewPlaceholder.Text = "미리보기 데이터 없음"
+        end
 
     elseif action == "Success" then
         ShowStatus("✅ " .. data)
