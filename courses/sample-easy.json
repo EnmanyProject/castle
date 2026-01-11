@@ -1,0 +1,23 @@
+{
+    "metadata": {
+        "id": "sample-easy",
+        "name": "Easy Tutorial Course",
+        "author": "Web Editor",
+        "version": "1.0",
+        "length": 1000,
+        "difficulty": "easy",
+        "description": "입문자를 위한 쉬운 튜토리얼 코스"
+    },
+    "gimmicks": [
+        {"type": "RotatingBar", "z": 100, "width": 24, "height": 3, "speed": 1},
+        {"type": "RotatingBar", "z": 200, "width": 26, "height": 3, "speed": 1.2},
+        {"type": "QuizGate", "id": 1, "triggerZ": 280, "gateZ": 310, "options": 2},
+        {"type": "JumpPad", "x": 0, "y": 0.5, "z": 400},
+        {"type": "JumpPad", "x": 0, "y": 0.5, "z": 450},
+        {"type": "SlimeZone", "z": 520, "length": 50},
+        {"type": "QuizGate", "id": 2, "triggerZ": 620, "gateZ": 650, "options": 2},
+        {"type": "RotatingBar", "z": 750, "width": 28, "height": 3, "speed": 1.5},
+        {"type": "ConveyorBelt", "z": 830, "length": 40, "direction": -1},
+        {"type": "QuizGate", "id": 3, "triggerZ": 920, "gateZ": 950, "options": 2}
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "version": "1.0",
+    "lastUpdated": "2026-01-11",
+    "courses": [
+        {
+            "id": "classic",
+            "name": "Quiz Castle Classic",
+            "author": "System",
+            "difficulty": "medium",
+            "description": "기본 코스 - 균형 잡힌 난이도",
+            "source": "library"
+        },
+        {
+            "id": "hardmode",
+            "name": "Quiz Castle Hard Mode",
+            "author": "System",
+            "difficulty": "hard",
+            "description": "고난이도 코스 - 빠른 장애물, 많은 퀴즈",
+            "source": "library"
+        }
+    ],
+    "webCourses": [
+        {
+            "id": "sample-easy",
+            "name": "Easy Tutorial Course",
+            "author": "Web Editor",
+            "difficulty": "easy",
+            "description": "입문자를 위한 쉬운 튜토리얼 코스",
+            "url": "courses/sample-easy.json"
+        }
+    ]
+}

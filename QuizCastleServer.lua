@@ -20,6 +20,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
 
 -- 서비스 로드 확인
 if not ReplicatedStorage then
@@ -36,6 +37,145 @@ pcall(function()
     WinsStore = DataStoreService:GetDataStore("QuizCastleV3_Wins")
     XPStore = DataStoreService:GetDataStore("QuizCastleV3_XP")
 end)
+
+-- ============================================
+-- 📚 COURSE MANAGER SYSTEM
+-- ============================================
+local CourseManager = {
+    currentCourse = nil,
+    courseLibrary = {},
+
+    -- GitHub Pages URL (웹 에디터에서 만든 코스 로드)
+    GITHUB_BASE_URL = "https://enmanyproject.github.io/castle/courses/",
+    COURSES_INDEX_URL = "https://enmanyproject.github.io/castle/courses.json"
+}
+
+-- 로컬 라이브러리에서 코스 로드
+function CourseManager:LoadLibrary()
+    local libraryFolder = ReplicatedStorage:FindFirstChild("CourseLibrary")
+    if not libraryFolder then
+        warn("📚 CourseLibrary folder not found in ReplicatedStorage")
+        return
+    end
+
+    for _, module in ipairs(libraryFolder:GetChildren()) do
+        if module:IsA("ModuleScript") then
+            local success, courseData = pcall(function()
+                return require(module)
+            end)
+
+            if success and courseData and courseData.metadata then
+                local id = courseData.metadata.id or module.Name
+                self.courseLibrary[id] = courseData
+                print(string.format("📚 Loaded course: %s (%s)", courseData.metadata.name, id))
+            else
+                warn("📚 Failed to load course module:", module.Name)
+            end
+        end
+    end
+end
+
+-- 라이브러리에서 코스 가져오기
+function CourseManager:GetCourse(courseId)
+    return self.courseLibrary[courseId]
+end
+
+-- 사용 가능한 코스 목록
+function CourseManager:GetAvailableCourses()
+    local courses = {}
+    for id, course in pairs(self.courseLibrary) do
+        table.insert(courses, {
+            id = id,
+            name = course.metadata.name,
+            author = course.metadata.author,
+            difficulty = course.metadata.difficulty,
+            description = course.metadata.description or ""
+        })
+    end
+    return courses
+end
+
+-- GitHub에서 코스 로드 (JSON)
+function CourseManager:LoadFromGitHub(courseId)
+    local url = self.GITHUB_BASE_URL .. courseId .. ".json"
+
+    local success, result = pcall(function()
+        return HttpService:GetAsync(url)
+    end)
+
+    if not success then
+        warn("🌐 Failed to fetch course from GitHub:", result)
+        return nil
+    end
+
+    local parseSuccess, courseData = pcall(function()
+        return HttpService:JSONDecode(result)
+    end)
+
+    if not parseSuccess then
+        warn("🌐 Failed to parse course JSON:", parseSuccess)
+        return nil
+    end
+
+    print(string.format("🌐 Loaded course from GitHub: %s", courseData.metadata.name))
+    return courseData
+end
+
+-- GitHub에서 코스 목록 가져오기
+function CourseManager:FetchGitHubCourseList()
+    local success, result = pcall(function()
+        return HttpService:GetAsync(self.COURSES_INDEX_URL)
+    end)
+
+    if not success then
+        warn("🌐 Failed to fetch course list:", result)
+        return nil
+    end
+
+    local parseSuccess, indexData = pcall(function()
+        return HttpService:JSONDecode(result)
+    end)
+
+    if parseSuccess and indexData then
+        return indexData.webCourses or {}
+    end
+
+    return nil
+end
+
+-- 현재 코스 설정
+function CourseManager:SetCurrentCourse(courseId, source)
+    source = source or "library"
+
+    if source == "library" then
+        local course = self:GetCourse(courseId)
+        if course then
+            self.currentCourse = course
+            print(string.format("✅ Course set: %s (from library)", course.metadata.name))
+            return true
+        end
+    elseif source == "github" then
+        local course = self:LoadFromGitHub(courseId)
+        if course then
+            self.currentCourse = course
+            print(string.format("✅ Course set: %s (from GitHub)", course.metadata.name))
+            return true
+        end
+    end
+
+    warn("❌ Failed to set course:", courseId)
+    return false
+end
+
+-- 현재 코스 가져오기 (없으면 기본 코스)
+function CourseManager:GetCurrentCourse()
+    if self.currentCourse then
+        return self.currentCourse
+    end
+
+    -- 기본 코스 (classic)
+    return self:GetCourse("classic")
+end
 
 -- ============================================
 -- ⭐ LEVEL SYSTEM CONFIGURATION
@@ -1700,44 +1840,36 @@ function CourseEngine:ValidateCourseData(courseData)
 end
 
 -- ============================================
--- 📋 DEFAULT COURSE DATA
+-- 📋 FALLBACK COURSE DATA (CourseLibrary 없을 때 사용)
 -- ============================================
-local DefaultCourseData = {
+local FallbackCourseData = {
     metadata = {
-        name = "Quiz Castle Classic",
+        id = "fallback",
+        name = "Quiz Castle Classic (Fallback)",
         author = "System",
         version = "3.2",
         length = 2000,
         difficulty = "medium"
     },
     gimmicks = {
-        -- 구간 1: 워밍업
         {type = "RotatingBar", z = 60, width = 28, height = 3, speed = 1.5},
         {type = "RotatingBar", z = 100, width = 30, height = 3, speed = 1.8},
         {type = "QuizGate", id = 1, triggerZ = 150, gateZ = 180, options = 2},
         {type = "RotatingBar", z = 250, width = 26, height = 3, speed = 2},
         {type = "QuizGate", id = 2, triggerZ = 320, gateZ = 350, options = 3},
-
-        -- 구간 2: 점프 & 엘리베이터
         {type = "JumpPad", x = 0, y = 0.5, z = 430},
         {type = "JumpPad", x = 0, y = 0.5, z = 500},
         {type = "JumpPad", x = 0, y = 0.5, z = 570},
         {type = "Elevator", id = 1, triggerZ = 620, elevZ = 670, options = 3},
         {type = "DisappearingBridge", z = 750, platformCount = 6},
-
-        -- 구간 3: 슬라임 & 퀴즈
         {type = "SlimeZone", z = 830, length = 80},
         {type = "QuizGate", id = 3, triggerZ = 960, gateZ = 990, options = 4},
         {type = "ConveyorBelt", z = 1040, length = 60, direction = -1},
         {type = "ElectricFloor", z = 1130, length = 60},
-
-        -- 구간 4: 위험지대
         {type = "RollingBoulder", zStart = 1220, zEnd = 1380},
         {type = "PunchingCorridor", z = 1280, length = 100},
         {type = "QuizGate", id = 4, triggerZ = 1420, gateZ = 1450, options = 3},
         {type = "Elevator", id = 2, triggerZ = 1500, elevZ = 1550, options = 4},
-
-        -- 구간 5: 파이널
         {type = "SlimeZone", z = 1620, length = 70},
         {type = "RotatingBar", z = 1730, width = 34, height = 3, speed = 2.5},
         {type = "RotatingBar", z = 1760, width = 34, height = 7, speed = -2},
@@ -1748,11 +1880,45 @@ local DefaultCourseData = {
     }
 }
 
+-- Fallback을 CourseManager에 등록
+CourseManager.courseLibrary["fallback"] = FallbackCourseData
+CourseManager.courseLibrary["classic"] = FallbackCourseData  -- classic도 fallback으로 초기화
+
 -- ============================================
--- 🏗️ BUILD FULL COURSE (CourseEngine 사용)
+-- 🏗️ BUILD FULL COURSE (CourseManager 사용)
 -- ============================================
 local function BuildCourse(parent)
-    CourseEngine:BuildFromData(parent, DefaultCourseData)
+    local courseData = CourseManager:GetCurrentCourse()
+    if not courseData then
+        courseData = FallbackCourseData
+        warn("⚠️ No course loaded, using fallback")
+    end
+    CourseEngine:BuildFromData(parent, courseData)
+end
+
+-- 코스 변경 및 재시작 함수
+local function ChangeCourse(courseId, source)
+    if CourseManager:SetCurrentCourse(courseId, source) then
+        -- 다음 라운드에 적용됨
+        return true, CourseManager.currentCourse.metadata.name
+    end
+    return false, "Course not found"
+end
+
+-- 코스 재빌드 (게임 중 코스 변경 시)
+local function RebuildCourse()
+    if TrackFolder then
+        ClearActiveGimmicks()
+        -- 기존 기믹 제거
+        for _, child in ipairs(TrackFolder:GetChildren()) do
+            if child.Name ~= "Floor" and child.Name ~= "Wall" and child.Name ~= "StartGate" and child.Name ~= "FinishLine" then
+                child:Destroy()
+            end
+        end
+        BuildCourse(TrackFolder)
+        CreateItemBoxes(TrackFolder)
+        print("🔄 Course rebuilt!")
+    end
 end
 
 -- ============================================
@@ -2327,13 +2493,111 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 -- ============================================
+-- 🎮 ADMIN COMMANDS (코스 관리)
+-- ============================================
+Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
+    -- 관리자 권한 체크 (게임 소유자 또는 Admins 테이블에 등록된 유저)
+    local isAdmin = player.UserId == game.CreatorId or table.find(Admins, player.UserId)
+    if not isAdmin then
+        warn(string.format("⚠️ Non-admin %s tried to use admin command: %s", player.Name, command))
+        return
+    end
+
+    local args = {...}
+
+    if command == "courses" or command == "list" then
+        -- 사용 가능한 코스 목록
+        local courses = CourseManager:GetAvailableCourses()
+        local msg = "📚 Available Courses:\n"
+        for _, c in ipairs(courses) do
+            local current = (CourseManager.currentCourse and CourseManager.currentCourse.metadata.id == c.id) and " ◀ CURRENT" or ""
+            msg = msg .. string.format("  • %s (%s) - %s%s\n", c.name, c.id, c.difficulty, current)
+        end
+        print(msg)
+        -- 클라이언트에 알림 (옵션)
+        Events.AdminCommand:FireClient(player, "CourseList", courses)
+
+    elseif command == "setcourse" then
+        -- 코스 변경: /setcourse classic 또는 /setcourse mycourse github
+        local courseId = args[1]
+        local source = args[2] or "library"
+
+        if not courseId then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: setcourse <courseId> [library|github]")
+            return
+        end
+
+        local success, name = ChangeCourse(courseId, source)
+        if success then
+            Events.AdminCommand:FireClient(player, "Success", "Course set to: " .. name)
+            print(string.format("✅ Admin %s changed course to: %s", player.Name, name))
+        else
+            Events.AdminCommand:FireClient(player, "Error", "Failed to load course: " .. courseId)
+        end
+
+    elseif command == "rebuild" then
+        -- 코스 즉시 재빌드
+        RebuildCourse()
+        Events.AdminCommand:FireClient(player, "Success", "Course rebuilt!")
+        print(string.format("🔄 Admin %s rebuilt the course", player.Name))
+
+    elseif command == "loadgithub" then
+        -- GitHub에서 코스 로드: /loadgithub mycourse
+        local courseId = args[1]
+        if not courseId then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: loadgithub <courseId>")
+            return
+        end
+
+        local courseData = CourseManager:LoadFromGitHub(courseId)
+        if courseData then
+            CourseManager.currentCourse = courseData
+            Events.AdminCommand:FireClient(player, "Success", "Loaded from GitHub: " .. courseData.metadata.name)
+            print(string.format("🌐 Admin %s loaded course from GitHub: %s", player.Name, courseData.metadata.name))
+        else
+            Events.AdminCommand:FireClient(player, "Error", "Failed to load from GitHub: " .. courseId)
+        end
+
+    elseif command == "courseinfo" then
+        -- 현재 코스 정보
+        local course = CourseManager:GetCurrentCourse()
+        if course then
+            local info = {
+                name = course.metadata.name,
+                author = course.metadata.author,
+                difficulty = course.metadata.difficulty,
+                length = course.metadata.length,
+                gimmickCount = #course.gimmicks
+            }
+            Events.AdminCommand:FireClient(player, "CourseInfo", info)
+            print(string.format("📋 Current Course: %s by %s (%d gimmicks)",
+                info.name, info.author, info.gimmickCount))
+        end
+    end
+end)
+
+-- ============================================
 -- 🚀 INITIALIZE
 -- ============================================
+
+-- 1. CourseLibrary 로드
+CourseManager:LoadLibrary()
+
+-- 2. 맵 초기화
 InitializeMap()
 
 print("")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("🏰 QUIZ CASTLE v3.2 Server Ready!")
 print("⭐ XP & Level System Active!")
+print("📚 Course Manager Active!")
 print("🎮 Min Players: " .. Config.MIN_PLAYERS)
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("")
+print("📚 Admin Commands:")
+print("  • courses - List available courses")
+print("  • setcourse <id> [library|github] - Change course")
+print("  • loadgithub <id> - Load course from GitHub")
+print("  • rebuild - Rebuild current course")
+print("  • courseinfo - Show current course info")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

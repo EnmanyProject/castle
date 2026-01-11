@@ -932,7 +932,7 @@
 
     <!-- Export Modal -->
     <div class="modal-overlay" id="exportModal">
-        <div class="modal">
+        <div class="modal" style="max-width: 700px;">
             <div class="modal-header">
                 <h2>💾 Export Course</h2>
                 <button class="modal-close" onclick="closeExportModal()">×</button>
@@ -940,9 +940,25 @@
             <div class="export-tabs">
                 <button class="export-tab active" onclick="switchExportTab('lua')">Lua (Roblox)</button>
                 <button class="export-tab" onclick="switchExportTab('json')">JSON</button>
+                <button class="export-tab" onclick="switchExportTab('github')">GitHub 저장</button>
             </div>
-            <pre class="export-code" id="exportCode"></pre>
-            <button class="btn btn-success copy-btn" onclick="copyExportCode()">📋 Copy to Clipboard</button>
+            <div id="exportContent">
+                <pre class="export-code" id="exportCode"></pre>
+            </div>
+            <div id="githubInstructions" style="display: none; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 15px;">
+                <h3 style="margin-bottom: 10px;">🌐 GitHub에 코스 저장하기</h3>
+                <ol style="line-height: 1.8; padding-left: 20px;">
+                    <li><strong>JSON 파일 다운로드</strong> 버튼을 클릭하세요</li>
+                    <li>GitHub 저장소의 <code>courses/</code> 폴더에 파일을 업로드하세요</li>
+                    <li><code>courses.json</code> 파일의 <code>webCourses</code> 배열에 추가하세요:</li>
+                </ol>
+                <pre style="background: #1a1a2e; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.85rem; overflow-x: auto;" id="coursesJsonExample"></pre>
+                <p style="color: #feca57; margin-top: 10px;">💡 게임에서 <code>/loadgithub 코스ID</code> 명령어로 로드할 수 있습니다!</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-success copy-btn" onclick="copyExportCode()" id="copyBtn">📋 Copy to Clipboard</button>
+                <button class="btn btn-primary" onclick="downloadJson()" id="downloadBtn" style="display: none;">⬇️ JSON 파일 다운로드</button>
+            </div>
         </div>
     </div>
 
@@ -1661,16 +1677,80 @@
         function switchExportTab(tab) {
             currentExportTab = tab;
             document.querySelectorAll('.export-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.export-tab:nth-child(${tab === 'lua' ? 1 : 2})`).classList.add('active');
+
+            const tabIndex = tab === 'lua' ? 1 : (tab === 'json' ? 2 : 3);
+            document.querySelector(`.export-tab:nth-child(${tabIndex})`).classList.add('active');
 
             const data = getCourseData();
             const codeElement = document.getElementById('exportCode');
+            const exportContent = document.getElementById('exportContent');
+            const githubInstructions = document.getElementById('githubInstructions');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
 
             if (tab === 'lua') {
+                exportContent.style.display = 'block';
+                githubInstructions.style.display = 'none';
+                copyBtn.style.display = 'block';
+                downloadBtn.style.display = 'none';
                 codeElement.textContent = generateLuaCode(data);
-            } else {
+            } else if (tab === 'json') {
+                exportContent.style.display = 'block';
+                githubInstructions.style.display = 'none';
+                copyBtn.style.display = 'block';
+                downloadBtn.style.display = 'none';
                 codeElement.textContent = JSON.stringify(data, null, 2);
+            } else if (tab === 'github') {
+                exportContent.style.display = 'none';
+                githubInstructions.style.display = 'block';
+                copyBtn.style.display = 'none';
+                downloadBtn.style.display = 'block';
+
+                // Generate course ID from name
+                const courseId = generateCourseId(data.metadata.name);
+
+                // Show example for courses.json
+                const example = {
+                    id: courseId,
+                    name: data.metadata.name,
+                    author: data.metadata.author,
+                    difficulty: data.metadata.difficulty,
+                    description: data.metadata.description || "",
+                    url: `courses/${courseId}.json`
+                };
+                document.getElementById('coursesJsonExample').textContent = JSON.stringify(example, null, 2);
             }
+        }
+
+        function generateCourseId(name) {
+            return name
+                .toLowerCase()
+                .replace(/[^a-z0-9가-힣]/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '')
+                .substring(0, 30) || 'custom-course';
+        }
+
+        function downloadJson() {
+            const data = getCourseData();
+            const courseId = generateCourseId(data.metadata.name);
+
+            // Add id to metadata for GitHub loading
+            data.metadata.id = courseId;
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${courseId}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`✅ ${courseId}.json 파일이 다운로드되었습니다!\n\n이 파일을 GitHub의 courses/ 폴더에 업로드하세요.`);
         }
 
         function generateLuaCode(data) {
