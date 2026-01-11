@@ -1321,13 +1321,24 @@ GimmickRegistry:Register({
             if rp then playersOnBelt[hit.Parent] = true end
         end)
         belt.TouchEnded:Connect(function(hit) playersOnBelt[hit.Parent] = nil end)
+
+        -- 컨베이어 벨트 힘 (강화됨)
+        local beltSpeed = 0.3 * (direction or -1)  -- 더 강한 힘
         task.spawn(function()
             while belt and belt.Parent do
                 for char, _ in pairs(playersOnBelt) do
                     local rp = char:FindFirstChild("HumanoidRootPart")
-                    if rp then rp.CFrame = rp.CFrame + Vector3.new(0, 0, direction * 0.02) end
+                    if rp then
+                        -- AssemblyLinearVelocity로 더 자연스러운 밀기
+                        local currentVel = rp.AssemblyLinearVelocity
+                        rp.AssemblyLinearVelocity = Vector3.new(
+                            currentVel.X,
+                            currentVel.Y,
+                            currentVel.Z + beltSpeed
+                        )
+                    end
                 end
-                task.wait()
+                task.wait(0.05)  -- 약간의 딜레이로 성능 개선
             end
         end)
         table.insert(ActiveGimmicks, belt)
@@ -2124,7 +2135,21 @@ Events.UseItem.OnServerEvent:Connect(function(player, itemType)
             end
         end)
     elseif usedItem == "Booster" then
-        Events.ItemEffect:FireClient(player, "SpeedBoost", {duration = 4.5})
+        -- 실제 속도 증가
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then
+            local origSpeed = hum.WalkSpeed
+            local boostSpeed = origSpeed * 1.6  -- 60% 속도 증가
+            hum.WalkSpeed = boostSpeed
+            Events.ItemEffect:FireClient(player, "SpeedBoost", {duration = 4.5})
+
+            -- 4.5초 후 원래 속도로 복구
+            task.delay(4.5, function()
+                if hum and hum.WalkSpeed == boostSpeed then
+                    hum.WalkSpeed = origSpeed
+                end
+            end)
+        end
     elseif usedItem == "Shield" then
         local shield = Instance.new("Part")
         shield.Size = Vector3.new(6,6,6)
