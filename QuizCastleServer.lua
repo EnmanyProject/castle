@@ -2651,6 +2651,294 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
 
         -- 모든 클라이언트에 설정 업데이트 알림
         Events.ConfigUpdate:FireAllClients(key, newValue)
+
+    elseif command == "getplayers" then
+        -- 플레이어 목록 가져오기
+        local playerList = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            local data = PlayerData[p]
+            local isRacing = table.find(GameState.playersInRace, p) ~= nil
+            local hasFinished = table.find(GameState.finishedPlayers, p) ~= nil
+
+            table.insert(playerList, {
+                name = p.Name,
+                odisplayName = p.DisplayName,
+                userId = p.UserId,
+                level = data and data.level or 1,
+                xp = data and data.xp or 0,
+                wins = data and data.wins or 0,
+                bestTime = data and data.bestTime or 0,
+                currentItem = data and data.currentItem or nil,
+                isRacing = isRacing,
+                hasFinished = hasFinished,
+                isAdmin = p.UserId == game.CreatorId or table.find(Admins, p.UserId) ~= nil
+            })
+        end
+        Events.AdminCommand:FireClient(player, "PlayerList", playerList)
+
+    elseif command == "kickplayer" then
+        -- 플레이어 추방
+        local targetName = args[1]
+        local reason = args[2] or "Kicked by admin"
+
+        if not targetName then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: kickplayer <name> [reason]")
+            return
+        end
+
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == targetName:lower() or p.DisplayName:lower() == targetName:lower() then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if not targetPlayer then
+            Events.AdminCommand:FireClient(player, "Error", "Player not found: " .. targetName)
+            return
+        end
+
+        if targetPlayer == player then
+            Events.AdminCommand:FireClient(player, "Error", "Cannot kick yourself!")
+            return
+        end
+
+        targetPlayer:Kick(reason)
+        Events.AdminCommand:FireClient(player, "Success", "Kicked: " .. targetPlayer.Name)
+        print(string.format("🚫 Admin %s kicked %s (reason: %s)", player.Name, targetPlayer.Name, reason))
+
+    elseif command == "teleportplayer" then
+        -- 플레이어 텔레포트
+        local targetName = args[1]
+        local destination = args[2] -- "lobby", "race", "tome" (to me)
+
+        if not targetName or not destination then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: teleportplayer <name> <lobby|race|tome>")
+            return
+        end
+
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == targetName:lower() or p.DisplayName:lower() == targetName:lower() then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if not targetPlayer then
+            Events.AdminCommand:FireClient(player, "Error", "Player not found: " .. targetName)
+            return
+        end
+
+        local char = targetPlayer.Character
+        if not char then
+            Events.AdminCommand:FireClient(player, "Error", "Player has no character")
+            return
+        end
+
+        local rp = char:FindFirstChild("HumanoidRootPart")
+        if not rp then
+            Events.AdminCommand:FireClient(player, "Error", "Player HumanoidRootPart not found")
+            return
+        end
+
+        if destination == "lobby" then
+            if LobbySpawn then
+                rp.CFrame = LobbySpawn.CFrame + Vector3.new(0, 3, 0)
+                Events.AdminCommand:FireClient(player, "Success", targetPlayer.Name .. " teleported to lobby")
+            end
+        elseif destination == "race" then
+            if RaceSpawn then
+                rp.CFrame = RaceSpawn.CFrame + Vector3.new(0, 3, 0)
+                Events.AdminCommand:FireClient(player, "Success", targetPlayer.Name .. " teleported to race start")
+            end
+        elseif destination == "tome" then
+            local adminChar = player.Character
+            if adminChar then
+                local adminRp = adminChar:FindFirstChild("HumanoidRootPart")
+                if adminRp then
+                    rp.CFrame = adminRp.CFrame + Vector3.new(3, 0, 0)
+                    Events.AdminCommand:FireClient(player, "Success", targetPlayer.Name .. " teleported to you")
+                end
+            end
+        else
+            Events.AdminCommand:FireClient(player, "Error", "Invalid destination. Use: lobby, race, tome")
+        end
+
+    elseif command == "giveitem" then
+        -- 아이템 지급
+        local targetName = args[1]
+        local itemType = args[2]
+
+        local validItems = {"Booster", "Shield", "Banana", "Lightning"}
+
+        if not targetName or not itemType then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: giveitem <name> <Booster|Shield|Banana|Lightning>")
+            return
+        end
+
+        if not table.find(validItems, itemType) then
+            Events.AdminCommand:FireClient(player, "Error", "Invalid item. Use: Booster, Shield, Banana, Lightning")
+            return
+        end
+
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == targetName:lower() or p.DisplayName:lower() == targetName:lower() then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if not targetPlayer then
+            Events.AdminCommand:FireClient(player, "Error", "Player not found: " .. targetName)
+            return
+        end
+
+        if PlayerData[targetPlayer] then
+            PlayerData[targetPlayer].currentItem = itemType
+            Events.ItemEffect:FireClient(targetPlayer, "GotItem", {itemType = itemType})
+            Events.AdminCommand:FireClient(player, "Success", "Gave " .. itemType .. " to " .. targetPlayer.Name)
+        end
+
+    elseif command == "givexp" then
+        -- XP 지급
+        local targetName = args[1]
+        local amount = tonumber(args[2])
+
+        if not targetName or not amount then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: givexp <name> <amount>")
+            return
+        end
+
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == targetName:lower() or p.DisplayName:lower() == targetName:lower() then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if not targetPlayer then
+            Events.AdminCommand:FireClient(player, "Error", "Player not found: " .. targetName)
+            return
+        end
+
+        if PlayerData[targetPlayer] then
+            local oldXP = PlayerData[targetPlayer].xp
+            PlayerData[targetPlayer].xp = oldXP + amount
+
+            -- Check for level up
+            local newLevel = 1
+            for lvl = 10, 1, -1 do
+                if PlayerData[targetPlayer].xp >= LevelConfig[lvl].xp then
+                    newLevel = lvl
+                    break
+                end
+            end
+
+            local oldLevel = PlayerData[targetPlayer].level
+            PlayerData[targetPlayer].level = newLevel
+
+            Events.XPUpdate:FireClient(targetPlayer, {
+                xp = PlayerData[targetPlayer].xp,
+                level = newLevel,
+                gained = amount
+            })
+
+            if newLevel > oldLevel then
+                Events.LevelUp:FireClient(targetPlayer, {
+                    newLevel = newLevel,
+                    levelName = LevelConfig[newLevel].name,
+                    icon = LevelConfig[newLevel].icon
+                })
+            end
+
+            Events.AdminCommand:FireClient(player, "Success",
+                string.format("Gave %d XP to %s (now %d XP, Lv.%d)", amount, targetPlayer.Name, PlayerData[targetPlayer].xp, newLevel))
+        end
+
+    elseif command == "setlevel" then
+        -- 레벨 설정
+        local targetName = args[1]
+        local level = tonumber(args[2])
+
+        if not targetName or not level or level < 1 or level > 10 then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: setlevel <name> <1-10>")
+            return
+        end
+
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == targetName:lower() or p.DisplayName:lower() == targetName:lower() then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if not targetPlayer then
+            Events.AdminCommand:FireClient(player, "Error", "Player not found: " .. targetName)
+            return
+        end
+
+        if PlayerData[targetPlayer] then
+            PlayerData[targetPlayer].level = level
+            PlayerData[targetPlayer].xp = LevelConfig[level].xp
+
+            Events.XPUpdate:FireClient(targetPlayer, {
+                xp = PlayerData[targetPlayer].xp,
+                level = level,
+                gained = 0
+            })
+
+            Events.LevelUp:FireClient(targetPlayer, {
+                newLevel = level,
+                levelName = LevelConfig[level].name,
+                icon = LevelConfig[level].icon
+            })
+
+            Events.AdminCommand:FireClient(player, "Success",
+                string.format("Set %s to Level %d (%s)", targetPlayer.Name, level, LevelConfig[level].name))
+        end
+
+    elseif command == "heal" then
+        -- 플레이어 힐
+        local targetName = args[1]
+
+        if not targetName then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: heal <name|all>")
+            return
+        end
+
+        local targets = {}
+        if targetName:lower() == "all" then
+            targets = Players:GetPlayers()
+        else
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Name:lower() == targetName:lower() or p.DisplayName:lower() == targetName:lower() then
+                    table.insert(targets, p)
+                    break
+                end
+            end
+        end
+
+        if #targets == 0 then
+            Events.AdminCommand:FireClient(player, "Error", "Player not found: " .. targetName)
+            return
+        end
+
+        for _, targetPlayer in ipairs(targets) do
+            local char = targetPlayer.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.Health = humanoid.MaxHealth
+                end
+            end
+        end
+
+        Events.AdminCommand:FireClient(player, "Success", "Healed " .. #targets .. " player(s)")
     end
 end)
 

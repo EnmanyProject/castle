@@ -1851,6 +1851,297 @@ settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function(
     settingsScroll.CanvasSize = UDim2.new(0, 0, 0, settingsLayout.AbsoluteContentSize.Y + 10)
 end)
 
+-- Section: Player Management
+CreateSection("👥 플레이어 관리")
+
+-- Player list container
+local playerFrame = Instance.new("Frame")
+playerFrame.Name = "PlayerFrame"
+playerFrame.Size = UDim2.new(1, 0, 0, 200)
+playerFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+playerFrame.BorderSizePixel = 0
+playerFrame.Parent = contentFrame
+
+local playerFrameCorner = Instance.new("UICorner")
+playerFrameCorner.CornerRadius = UDim.new(0, 8)
+playerFrameCorner.Parent = playerFrame
+
+-- Refresh button
+local refreshPlayersBtn = Instance.new("TextButton")
+refreshPlayersBtn.Size = UDim2.new(1, -10, 0, 25)
+refreshPlayersBtn.Position = UDim2.new(0, 5, 0, 5)
+refreshPlayersBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
+refreshPlayersBtn.Text = "🔄 플레이어 목록 새로고침"
+refreshPlayersBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshPlayersBtn.TextSize = 11
+refreshPlayersBtn.Font = Enum.Font.GothamMedium
+refreshPlayersBtn.Parent = playerFrame
+
+local refreshPlayersBtnCorner = Instance.new("UICorner")
+refreshPlayersBtnCorner.CornerRadius = UDim.new(0, 6)
+refreshPlayersBtnCorner.Parent = refreshPlayersBtn
+
+refreshPlayersBtn.MouseButton1Click:Connect(function()
+    Events.AdminCommand:FireServer("getplayers")
+end)
+
+-- Player list scroll
+local playerListScroll = Instance.new("ScrollingFrame")
+playerListScroll.Size = UDim2.new(1, -10, 1, -35)
+playerListScroll.Position = UDim2.new(0, 5, 0, 32)
+playerListScroll.BackgroundTransparency = 1
+playerListScroll.ScrollBarThickness = 4
+playerListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerListScroll.Parent = playerFrame
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 3)
+playerListLayout.Parent = playerListScroll
+
+-- Selected player
+local selectedPlayer = nil
+
+-- Player list cache
+local playerListCache = {}
+
+-- Create player row
+local function CreatePlayerRow(playerData)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -5, 0, 35)
+    row.BackgroundColor3 = Color3.fromRGB(45, 45, 75)
+    row.BorderSizePixel = 0
+    row.Parent = playerListScroll
+
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = UDim.new(0, 6)
+    rowCorner.Parent = row
+
+    -- Status indicator
+    local statusDot = Instance.new("Frame")
+    statusDot.Size = UDim2.new(0, 8, 0, 8)
+    statusDot.Position = UDim2.new(0, 8, 0.5, -4)
+    statusDot.BorderSizePixel = 0
+    statusDot.Parent = row
+
+    local statusDotCorner = Instance.new("UICorner")
+    statusDotCorner.CornerRadius = UDim.new(1, 0)
+    statusDotCorner.Parent = statusDot
+
+    if playerData.isRacing then
+        if playerData.hasFinished then
+            statusDot.BackgroundColor3 = Color3.fromRGB(255, 215, 0) -- Gold - finished
+        else
+            statusDot.BackgroundColor3 = Color3.fromRGB(100, 255, 100) -- Green - racing
+        end
+    else
+        statusDot.BackgroundColor3 = Color3.fromRGB(150, 150, 150) -- Gray - lobby
+    end
+
+    -- Admin badge
+    local adminBadge = ""
+    if playerData.isAdmin then
+        adminBadge = "👑 "
+    end
+
+    -- Name
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.5, -20, 1, 0)
+    nameLabel.Position = UDim2.new(0, 20, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = adminBadge .. playerData.name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextSize = 11
+    nameLabel.Font = Enum.Font.GothamMedium
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    nameLabel.Parent = row
+
+    -- Level
+    local levelLabel = Instance.new("TextLabel")
+    levelLabel.Size = UDim2.new(0, 50, 1, 0)
+    levelLabel.Position = UDim2.new(0.5, -25, 0, 0)
+    levelLabel.BackgroundTransparency = 1
+    levelLabel.Text = "Lv." .. playerData.level
+    levelLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    levelLabel.TextSize = 10
+    levelLabel.Font = Enum.Font.GothamBold
+    levelLabel.Parent = row
+
+    -- Select button
+    local selectBtn = Instance.new("TextButton")
+    selectBtn.Size = UDim2.new(0, 50, 0, 22)
+    selectBtn.Position = UDim2.new(1, -55, 0.5, -11)
+    selectBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 180)
+    selectBtn.Text = "선택"
+    selectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selectBtn.TextSize = 10
+    selectBtn.Font = Enum.Font.GothamMedium
+    selectBtn.Parent = row
+
+    local selectBtnCorner = Instance.new("UICorner")
+    selectBtnCorner.CornerRadius = UDim.new(0, 4)
+    selectBtnCorner.Parent = selectBtn
+
+    selectBtn.MouseButton1Click:Connect(function()
+        selectedPlayer = playerData.name
+        UpdateSelectedPlayerUI()
+        ShowStatus("👤 선택됨: " .. playerData.name)
+    end)
+
+    -- Hover effect
+    local hoverBtn = Instance.new("TextButton")
+    hoverBtn.Size = UDim2.new(0.7, 0, 1, 0)
+    hoverBtn.BackgroundTransparency = 1
+    hoverBtn.Text = ""
+    hoverBtn.Parent = row
+
+    hoverBtn.MouseEnter:Connect(function()
+        row.BackgroundColor3 = Color3.fromRGB(55, 55, 95)
+    end)
+    hoverBtn.MouseLeave:Connect(function()
+        row.BackgroundColor3 = Color3.fromRGB(45, 45, 75)
+    end)
+
+    return row
+end
+
+-- Update player list UI
+local function UpdatePlayerListUI(players)
+    playerListCache = players
+
+    -- Clear existing
+    for _, child in ipairs(playerListScroll:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+
+    for _, playerData in ipairs(players) do
+        CreatePlayerRow(playerData)
+    end
+
+    -- Update canvas size
+    playerListScroll.CanvasSize = UDim2.new(0, 0, 0, #players * 38)
+end
+
+-- Selected player actions frame
+local actionsFrame = Instance.new("Frame")
+actionsFrame.Name = "ActionsFrame"
+actionsFrame.Size = UDim2.new(1, 0, 0, 180)
+actionsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+actionsFrame.BorderSizePixel = 0
+actionsFrame.Parent = contentFrame
+
+local actionsFrameCorner = Instance.new("UICorner")
+actionsFrameCorner.CornerRadius = UDim.new(0, 8)
+actionsFrameCorner.Parent = actionsFrame
+
+-- Selected player label
+local selectedPlayerLabel = Instance.new("TextLabel")
+selectedPlayerLabel.Size = UDim2.new(1, -10, 0, 25)
+selectedPlayerLabel.Position = UDim2.new(0, 5, 0, 5)
+selectedPlayerLabel.BackgroundTransparency = 1
+selectedPlayerLabel.Text = "👤 플레이어를 선택하세요"
+selectedPlayerLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
+selectedPlayerLabel.TextSize = 12
+selectedPlayerLabel.Font = Enum.Font.GothamBold
+selectedPlayerLabel.TextXAlignment = Enum.TextXAlignment.Left
+selectedPlayerLabel.Parent = actionsFrame
+
+-- Action buttons container
+local actionButtonsFrame = Instance.new("Frame")
+actionButtonsFrame.Size = UDim2.new(1, -10, 1, -35)
+actionButtonsFrame.Position = UDim2.new(0, 5, 0, 30)
+actionButtonsFrame.BackgroundTransparency = 1
+actionButtonsFrame.Parent = actionsFrame
+
+local actionButtonsLayout = Instance.new("UIGridLayout")
+actionButtonsLayout.CellSize = UDim2.new(0.5, -3, 0, 28)
+actionButtonsLayout.CellPadding = UDim2.new(0, 6, 0, 4)
+actionButtonsLayout.Parent = actionButtonsFrame
+
+-- Helper to create action button
+local function CreateActionButton(text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 10
+    btn.Font = Enum.Font.GothamMedium
+    btn.Parent = actionButtonsFrame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        if selectedPlayer then
+            callback(selectedPlayer)
+        else
+            ShowStatus("❌ 플레이어를 먼저 선택하세요", true)
+        end
+    end)
+
+    return btn
+end
+
+-- Teleport buttons
+CreateActionButton("🏠 로비로", Color3.fromRGB(60, 120, 60), function(name)
+    Events.AdminCommand:FireServer("teleportplayer", name, "lobby")
+end)
+
+CreateActionButton("🏁 레이스로", Color3.fromRGB(60, 100, 160), function(name)
+    Events.AdminCommand:FireServer("teleportplayer", name, "race")
+end)
+
+CreateActionButton("📍 내게로", Color3.fromRGB(100, 80, 160), function(name)
+    Events.AdminCommand:FireServer("teleportplayer", name, "tome")
+end)
+
+CreateActionButton("💚 힐", Color3.fromRGB(80, 160, 80), function(name)
+    Events.AdminCommand:FireServer("heal", name)
+end)
+
+-- Item buttons
+CreateActionButton("🚀 부스터", Color3.fromRGB(255, 150, 50), function(name)
+    Events.AdminCommand:FireServer("giveitem", name, "Booster")
+end)
+
+CreateActionButton("🛡️ 실드", Color3.fromRGB(100, 150, 255), function(name)
+    Events.AdminCommand:FireServer("giveitem", name, "Shield")
+end)
+
+CreateActionButton("🍌 바나나", Color3.fromRGB(255, 220, 100), function(name)
+    Events.AdminCommand:FireServer("giveitem", name, "Banana")
+end)
+
+CreateActionButton("⚡ 번개", Color3.fromRGB(255, 255, 100), function(name)
+    Events.AdminCommand:FireServer("giveitem", name, "Lightning")
+end)
+
+-- XP/Level buttons
+CreateActionButton("⭐ +100 XP", Color3.fromRGB(180, 150, 50), function(name)
+    Events.AdminCommand:FireServer("givexp", name, 100)
+end)
+
+CreateActionButton("🚫 추방", Color3.fromRGB(200, 60, 60), function(name)
+    Events.AdminCommand:FireServer("kickplayer", name)
+end)
+
+-- Update selected player UI
+function UpdateSelectedPlayerUI()
+    if selectedPlayer then
+        selectedPlayerLabel.Text = "👤 선택됨: " .. selectedPlayer
+    else
+        selectedPlayerLabel.Text = "👤 플레이어를 선택하세요"
+    end
+end
+
+-- Heal All button
+CreateButton("💚 전체 힐", Color3.fromRGB(80, 160, 80), function()
+    Events.AdminCommand:FireServer("heal", "all")
+end)
+
 -- Status Label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
@@ -1984,6 +2275,11 @@ Events.AdminCommand.OnClientEvent:Connect(function(action, data)
         -- Received config data
         UpdateSettingsUI(data)
         ShowStatus("⚙️ 설정을 불러왔습니다")
+
+    elseif action == "PlayerList" then
+        -- Received player list
+        UpdatePlayerListUI(data)
+        ShowStatus(string.format("👥 %d명의 플레이어", #data))
 
     elseif action == "Error" then
         ShowStatus("❌ " .. data, true)
