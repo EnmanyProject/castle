@@ -293,6 +293,39 @@
             background: rgba(255, 107, 107, 0.5);
         }
 
+        /* Drag and Drop */
+        .gimmick-block {
+            cursor: grab;
+        }
+
+        .gimmick-block.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+            background: rgba(72, 219, 251, 0.3);
+            border: 2px dashed #48dbfb;
+        }
+
+        .gimmick-block.drag-over {
+            border-top: 3px solid #48dbfb;
+            margin-top: -3px;
+        }
+
+        .gimmick-block.drag-over-bottom {
+            border-bottom: 3px solid #48dbfb;
+            margin-bottom: 5px;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            padding: 0 5px;
+            color: #666;
+            font-size: 1.2rem;
+        }
+
+        .drag-handle:hover {
+            color: #48dbfb;
+        }
+
         /* Right Panel - Properties */
         .properties-panel {
             background: rgba(0, 0, 0, 0.2);
@@ -1341,7 +1374,15 @@
                 return `
                     <div class="gimmick-block ${schema.difficulty} ${selectedGimmickIndex === index ? 'selected' : ''}"
                          style="${exceedStyle}"
+                         data-index="${index}"
+                         draggable="true"
+                         ondragstart="handleDragStart(event, ${index})"
+                         ondragover="handleDragOver(event, ${index})"
+                         ondrop="handleDrop(event, ${index})"
+                         ondragend="handleDragEnd(event)"
+                         ondragleave="handleDragLeave(event)"
                          onclick="selectGimmick(${index})">
+                        <div class="drag-handle" title="드래그하여 순서 변경">⋮⋮</div>
                         <div class="gimmick-block-icon">${exceedIcon}${schema.icon}</div>
                         <div class="gimmick-block-info">
                             <div class="gimmick-block-name">${schema.displayName}${exceeds ? ' (범위 초과!)' : ''}</div>
@@ -1483,6 +1524,101 @@
             }
             renderGimmickList();
             renderProperties();
+        }
+
+        // ============================================
+        // 🔀 DRAG AND DROP HANDLERS
+        // ============================================
+        let draggedIndex = -1;
+
+        function handleDragStart(event, index) {
+            draggedIndex = index;
+            event.target.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', index);
+        }
+
+        function handleDragOver(event, index) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+
+            if (draggedIndex === -1 || draggedIndex === index) return;
+
+            const targetElement = event.currentTarget;
+
+            // Remove previous drag-over classes
+            document.querySelectorAll('.gimmick-block').forEach(el => {
+                el.classList.remove('drag-over', 'drag-over-bottom');
+            });
+
+            // Calculate if we're in the top or bottom half of the element
+            const rect = targetElement.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+
+            if (event.clientY < midY) {
+                targetElement.classList.add('drag-over');
+            } else {
+                targetElement.classList.add('drag-over-bottom');
+            }
+        }
+
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('drag-over', 'drag-over-bottom');
+        }
+
+        function handleDrop(event, targetIndex) {
+            event.preventDefault();
+
+            // Remove all drag styling
+            document.querySelectorAll('.gimmick-block').forEach(el => {
+                el.classList.remove('dragging', 'drag-over', 'drag-over-bottom');
+            });
+
+            if (draggedIndex === -1 || draggedIndex === targetIndex) {
+                draggedIndex = -1;
+                return;
+            }
+
+            // Calculate if we're dropping above or below the target
+            const targetElement = event.currentTarget;
+            const rect = targetElement.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            const dropBelow = event.clientY >= midY;
+
+            // Remove the dragged item
+            const [draggedItem] = courseGimmicks.splice(draggedIndex, 1);
+
+            // Calculate new index
+            let newIndex = targetIndex;
+            if (draggedIndex < targetIndex) {
+                newIndex = dropBelow ? targetIndex : targetIndex - 1;
+            } else {
+                newIndex = dropBelow ? targetIndex + 1 : targetIndex;
+            }
+
+            // Insert at new position
+            courseGimmicks.splice(newIndex, 0, draggedItem);
+
+            // Update selected index if needed
+            if (selectedGimmickIndex === draggedIndex) {
+                selectedGimmickIndex = newIndex;
+            } else if (draggedIndex < selectedGimmickIndex && newIndex >= selectedGimmickIndex) {
+                selectedGimmickIndex--;
+            } else if (draggedIndex > selectedGimmickIndex && newIndex <= selectedGimmickIndex) {
+                selectedGimmickIndex++;
+            }
+
+            draggedIndex = -1;
+            renderGimmickList();
+            renderProperties();
+        }
+
+        function handleDragEnd(event) {
+            event.target.classList.remove('dragging');
+            document.querySelectorAll('.gimmick-block').forEach(el => {
+                el.classList.remove('drag-over', 'drag-over-bottom');
+            });
+            draggedIndex = -1;
         }
 
         function newCourse() {
