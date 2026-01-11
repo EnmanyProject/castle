@@ -1139,6 +1139,9 @@ local AdminPanel = {
     currentCourse = nil
 }
 
+-- Forward declaration for auto-sync status label
+local autoSyncStatusLabel = nil
+
 -- Admin Panel GUI
 local adminScreenGui = Instance.new("ScreenGui")
 adminScreenGui.Name = "AdminPanel"
@@ -1595,6 +1598,118 @@ end)
 
 CreateButton("🔥 하드모드 코스로 변경", Color3.fromRGB(180, 60, 60), function()
     Events.AdminCommand:FireServer("setcourse", "hardmode", "library")
+end)
+
+-- Section: Auto-Sync
+CreateSection("🔄 GitHub 자동 동기화")
+
+-- Auto-sync status frame
+local autoSyncFrame = Instance.new("Frame")
+autoSyncFrame.Name = "AutoSyncFrame"
+autoSyncFrame.Size = UDim2.new(1, 0, 0, 80)
+autoSyncFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+autoSyncFrame.BorderSizePixel = 0
+autoSyncFrame.Parent = contentFrame
+
+local autoSyncCorner = Instance.new("UICorner")
+autoSyncCorner.CornerRadius = UDim.new(0, 8)
+autoSyncCorner.Parent = autoSyncFrame
+
+-- Status label
+autoSyncStatusLabel = Instance.new("TextLabel")
+autoSyncStatusLabel.Name = "StatusLabel"
+autoSyncStatusLabel.Size = UDim2.new(1, -20, 0, 30)
+autoSyncStatusLabel.Position = UDim2.new(0, 10, 0, 5)
+autoSyncStatusLabel.BackgroundTransparency = 1
+autoSyncStatusLabel.Font = Enum.Font.GothamMedium
+autoSyncStatusLabel.TextSize = 14
+autoSyncStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+autoSyncStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+autoSyncStatusLabel.Text = "🔄 Auto-Sync: ON (30s 간격)"
+autoSyncStatusLabel.Parent = autoSyncFrame
+
+-- Buttons row
+local syncButtonsRow = Instance.new("Frame")
+syncButtonsRow.Size = UDim2.new(1, -20, 0, 35)
+syncButtonsRow.Position = UDim2.new(0, 10, 0, 38)
+syncButtonsRow.BackgroundTransparency = 1
+syncButtonsRow.Parent = autoSyncFrame
+
+local syncButtonsLayout = Instance.new("UIListLayout")
+syncButtonsLayout.FillDirection = Enum.FillDirection.Horizontal
+syncButtonsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+syncButtonsLayout.Padding = UDim.new(0, 8)
+syncButtonsLayout.Parent = syncButtonsRow
+
+-- Toggle button
+local toggleSyncBtn = Instance.new("TextButton")
+toggleSyncBtn.Size = UDim2.new(0, 100, 1, 0)
+toggleSyncBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+toggleSyncBtn.Font = Enum.Font.GothamBold
+toggleSyncBtn.TextSize = 12
+toggleSyncBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleSyncBtn.Text = "⏸️ 일시정지"
+toggleSyncBtn.Parent = syncButtonsRow
+
+local toggleSyncCorner = Instance.new("UICorner")
+toggleSyncCorner.CornerRadius = UDim.new(0, 6)
+toggleSyncCorner.Parent = toggleSyncBtn
+
+local autoSyncEnabled = true
+toggleSyncBtn.MouseButton1Click:Connect(function()
+    Events.AdminCommand:FireServer("autosync")
+    autoSyncEnabled = not autoSyncEnabled
+    if autoSyncEnabled then
+        toggleSyncBtn.Text = "⏸️ 일시정지"
+        toggleSyncBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+        autoSyncStatusLabel.Text = "🔄 Auto-Sync: ON"
+        autoSyncStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        toggleSyncBtn.Text = "▶️ 재개"
+        toggleSyncBtn.BackgroundColor3 = Color3.fromRGB(120, 120, 60)
+        autoSyncStatusLabel.Text = "🔄 Auto-Sync: OFF"
+        autoSyncStatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    end
+end)
+
+-- Sync now button
+local syncNowBtn = Instance.new("TextButton")
+syncNowBtn.Size = UDim2.new(0, 100, 1, 0)
+syncNowBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+syncNowBtn.Font = Enum.Font.GothamBold
+syncNowBtn.TextSize = 12
+syncNowBtn.TextColor3 = Color3.new(1, 1, 1)
+syncNowBtn.Text = "🔄 지금 동기화"
+syncNowBtn.Parent = syncButtonsRow
+
+local syncNowCorner = Instance.new("UICorner")
+syncNowCorner.CornerRadius = UDim.new(0, 6)
+syncNowCorner.Parent = syncNowBtn
+
+syncNowBtn.MouseButton1Click:Connect(function()
+    Events.AdminCommand:FireServer("syncnow")
+    syncNowBtn.Text = "⏳ 확인 중..."
+    task.delay(2, function()
+        syncNowBtn.Text = "🔄 지금 동기화"
+    end)
+end)
+
+-- Status check button
+local checkStatusBtn = Instance.new("TextButton")
+checkStatusBtn.Size = UDim2.new(0, 80, 1, 0)
+checkStatusBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+checkStatusBtn.Font = Enum.Font.GothamBold
+checkStatusBtn.TextSize = 12
+checkStatusBtn.TextColor3 = Color3.new(1, 1, 1)
+checkStatusBtn.Text = "ℹ️ 상태"
+checkStatusBtn.Parent = syncButtonsRow
+
+local checkStatusCorner = Instance.new("UICorner")
+checkStatusCorner.CornerRadius = UDim.new(0, 6)
+checkStatusCorner.Parent = checkStatusBtn
+
+checkStatusBtn.MouseButton1Click:Connect(function()
+    Events.AdminCommand:FireServer("autosyncstatus")
 end)
 
 -- Section: Game Settings
@@ -2280,6 +2395,31 @@ Events.AdminCommand.OnClientEvent:Connect(function(action, data)
         -- Received player list
         UpdatePlayerListUI(data)
         ShowStatus(string.format("👥 %d명의 플레이어", #data))
+
+    elseif action == "AutoSyncNotify" then
+        -- GitHub 자동 동기화 알림
+        ShowStatus(data.message)
+        -- 토스트 알림도 표시
+        if autoSyncStatusLabel then
+            autoSyncStatusLabel.Text = "🔄 " .. (data.message or "업데이트됨")
+            task.delay(5, function()
+                if autoSyncStatusLabel then
+                    autoSyncStatusLabel.Text = "🔄 Auto-Sync: ON"
+                end
+            end)
+        end
+
+    elseif action == "AutoSyncStatus" then
+        -- 자동 동기화 상태 정보
+        if data then
+            local statusText = data.enabled and "ON" or "OFF"
+            if autoSyncStatusLabel then
+                autoSyncStatusLabel.Text = string.format("🔄 Auto-Sync: %s (v%s)",
+                    statusText, data.lastVersion or "?")
+            end
+            ShowStatus(string.format("🔄 Auto-Sync: %s | Interval: %ds | Last: %s",
+                statusText, data.interval or 30, data.lastVersion or "unknown"))
+        end
 
     elseif action == "Error" then
         ShowStatus("❌ " .. data, true)

@@ -47,7 +47,14 @@ local CourseManager = {
 
     -- GitHub Pages URL (웹 에디터에서 만든 코스 로드)
     GITHUB_BASE_URL = "https://enmanyproject.github.io/castle/courses/",
-    COURSES_INDEX_URL = "https://enmanyproject.github.io/castle/courses.json"
+    COURSES_INDEX_URL = "https://enmanyproject.github.io/castle/courses.json",
+
+    -- Auto-sync settings
+    autoSyncEnabled = true,
+    pollInterval = 30,  -- seconds
+    lastKnownVersion = nil,
+    lastCheckedTime = 0,
+    isPolling = false
 }
 
 -- 로컬 라이브러리에서 코스 로드
@@ -175,6 +182,127 @@ function CourseManager:GetCurrentCourse()
 
     -- 기본 코스 (classic)
     return self:GetCourse("classic")
+end
+
+-- GitHub 업데이트 확인
+function CourseManager:CheckForUpdates()
+    local success, result = pcall(function()
+        return HttpService:GetAsync(self.COURSES_INDEX_URL .. "?t=" .. os.time())
+    end)
+
+    if not success then
+        return false, nil
+    end
+
+    local parseSuccess, indexData = pcall(function()
+        return HttpService:JSONDecode(result)
+    end)
+
+    if not parseSuccess or not indexData then
+        return false, nil
+    end
+
+    local currentVersion = indexData.lastUpdated or indexData.version or "unknown"
+
+    -- 첫 체크인 경우 버전만 저장
+    if not self.lastKnownVersion then
+        self.lastKnownVersion = currentVersion
+        print("🔄 Auto-sync initialized. Version:", currentVersion)
+        return false, nil
+    end
+
+    -- 버전이 변경됨
+    if currentVersion ~= self.lastKnownVersion then
+        local oldVersion = self.lastKnownVersion
+        self.lastKnownVersion = currentVersion
+        print(string.format("🔄 Update detected! %s → %s", oldVersion, currentVersion))
+        return true, indexData
+    end
+
+    return false, nil
+end
+
+-- 업데이트 시 코스 새로고침
+function CourseManager:ApplyUpdate(indexData)
+    local updatedCourses = {}
+
+    -- webCourses에서 변경된 코스 로드
+    if indexData.webCourses then
+        for _, webCourse in ipairs(indexData.webCourses) do
+            local courseData = self:LoadFromGitHub(webCourse.id)
+            if courseData then
+                self.courseLibrary[webCourse.id] = courseData
+                table.insert(updatedCourses, webCourse.id)
+            end
+        end
+    end
+
+    return updatedCourses
+end
+
+-- 관리자들에게 알림 전송
+function CourseManager:NotifyAdmins(message, data)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.UserId == game.CreatorId or table.find(Admins, player.UserId) then
+            Events.AdminCommand:FireClient(player, "AutoSyncNotify", {
+                message = message,
+                data = data,
+                timestamp = os.time()
+            })
+        end
+    end
+end
+
+-- 자동 동기화 시작
+function CourseManager:StartAutoSync()
+    if self.isPolling then
+        return
+    end
+
+    self.isPolling = true
+    print("🔄 Auto-sync started (interval: " .. self.pollInterval .. "s)")
+
+    task.spawn(function()
+        while self.isPolling and self.autoSyncEnabled do
+            task.wait(self.pollInterval)
+
+            local hasUpdate, indexData = self:CheckForUpdates()
+
+            if hasUpdate and indexData then
+                local updatedCourses = self:ApplyUpdate(indexData)
+
+                if #updatedCourses > 0 then
+                    local message = string.format("🔄 GitHub에서 %d개 코스 업데이트됨: %s",
+                        #updatedCourses, table.concat(updatedCourses, ", "))
+                    print(message)
+                    self:NotifyAdmins(message, {
+                        courses = updatedCourses,
+                        version = self.lastKnownVersion
+                    })
+                end
+            end
+
+            self.lastCheckedTime = os.time()
+        end
+    end)
+end
+
+-- 자동 동기화 중지
+function CourseManager:StopAutoSync()
+    self.isPolling = false
+    print("🔄 Auto-sync stopped")
+end
+
+-- 자동 동기화 상태 토글
+function CourseManager:ToggleAutoSync()
+    if self.autoSyncEnabled then
+        self.autoSyncEnabled = false
+        self:StopAutoSync()
+    else
+        self.autoSyncEnabled = true
+        self:StartAutoSync()
+    end
+    return self.autoSyncEnabled
 end
 
 -- ============================================
@@ -2575,6 +2703,42 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
                 info.name, info.author, info.gimmickCount))
         end
 
+    elseif command == "autosync" then
+        -- GitHub 자동 동기화 토글
+        local enabled = CourseManager:ToggleAutoSync()
+        local status = enabled and "ENABLED" or "DISABLED"
+        Events.AdminCommand:FireClient(player, "Success", "🔄 Auto-Sync: " .. status)
+        print(string.format("🔄 Auto-Sync toggled by %s: %s", player.Name, status))
+
+    elseif command == "syncnow" then
+        -- 즉시 동기화 체크
+        Events.AdminCommand:FireClient(player, "Success", "🔄 Checking for updates...")
+        local hasUpdate, indexData = CourseManager:CheckForUpdates()
+        if hasUpdate and indexData then
+            local updatedCourses = CourseManager:ApplyUpdate(indexData)
+            if #updatedCourses > 0 then
+                local message = string.format("🔄 %d개 코스 업데이트됨: %s",
+                    #updatedCourses, table.concat(updatedCourses, ", "))
+                Events.AdminCommand:FireClient(player, "Success", message)
+                CourseManager:NotifyAdmins(message, {courses = updatedCourses})
+            else
+                Events.AdminCommand:FireClient(player, "Success", "✅ 모든 코스가 최신 상태입니다")
+            end
+        else
+            Events.AdminCommand:FireClient(player, "Success", "✅ 업데이트 없음 (최신 버전)")
+        end
+
+    elseif command == "autosyncstatus" then
+        -- 자동 동기화 상태 확인
+        local status = {
+            enabled = CourseManager.autoSyncEnabled,
+            isPolling = CourseManager.isPolling,
+            interval = CourseManager.pollInterval,
+            lastVersion = CourseManager.lastKnownVersion,
+            lastChecked = CourseManager.lastCheckedTime
+        }
+        Events.AdminCommand:FireClient(player, "AutoSyncStatus", status)
+
     elseif command == "getconfig" then
         -- 현재 설정 가져오기
         local configData = {
@@ -2949,7 +3113,10 @@ end)
 -- 1. CourseLibrary 로드
 CourseManager:LoadLibrary()
 
--- 2. 맵 초기화
+-- 2. GitHub Auto-Sync 시작
+CourseManager:StartAutoSync()
+
+-- 3. 맵 초기화
 InitializeMap()
 
 print("")
@@ -2966,4 +3133,7 @@ print("  • setcourse <id> [library|github] - Change course")
 print("  • loadgithub <id> - Load course from GitHub")
 print("  • rebuild - Rebuild current course")
 print("  • courseinfo - Show current course info")
+print("  • autosync - Toggle GitHub auto-sync")
+print("  • syncnow - Force sync check now")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("🔄 Auto-Sync: ENABLED (every 30s)")
