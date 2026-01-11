@@ -1,0 +1,53 @@
+{
+    "name": "QuizCastle",
+    "tree": {
+        "$className": "DataModel",
+
+        "ServerScriptService": {
+            "$className": "ServerScriptService",
+            "$path": "src/server"
+        },
+
+        "StarterPlayer": {
+            "$className": "StarterPlayer",
+            "StarterPlayerScripts": {
+                "$className": "StarterPlayerScripts",
+                "$path": "src/client"
+            }
+        },
+
+        "ReplicatedStorage": {
+            "$className": "ReplicatedStorage",
+            "Shared": {
+                "$path": "src/shared"
+            },
+            "Events": {
+                "$className": "Folder",
+                "GameEvent": { "$className": "RemoteEvent" },
+                "RoundUpdate": { "$className": "RemoteEvent" },
+                "GateQuiz": { "$className": "RemoteEvent" },
+                "ItemEffect": { "$className": "RemoteEvent" },
+                "TimeUpdate": { "$className": "RemoteEvent" },
+                "LobbyUpdate": { "$className": "RemoteEvent" },
+                "XPUpdate": { "$className": "RemoteEvent" },
+                "LevelUp": { "$className": "RemoteEvent" },
+                "UseItem": { "$className": "RemoteEvent" },
+                "AdminCommand": { "$className": "RemoteEvent" },
+                "ConfigUpdate": { "$className": "RemoteEvent" }
+            },
+            "CourseLibrary": {
+                "$className": "Folder"
+            }
+        },
+
+        "Workspace": {
+            "$className": "Workspace",
+            "$properties": {
+                "FilteringEnabled": true
+            },
+            "Map": {
+                "$className": "Folder"
+            }
+        }
+    }
+}
