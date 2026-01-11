@@ -2574,6 +2574,83 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
             print(string.format("📋 Current Course: %s by %s (%d gimmicks)",
                 info.name, info.author, info.gimmickCount))
         end
+
+    elseif command == "getconfig" then
+        -- 현재 설정 가져오기
+        local configData = {
+            -- 게임 설정
+            MIN_PLAYERS = Config.MIN_PLAYERS,
+            MAX_PLAYERS = Config.MAX_PLAYERS,
+            LOBBY_COUNTDOWN = Config.LOBBY_COUNTDOWN,
+            INTERMISSION = Config.INTERMISSION,
+
+            -- 장애물 토글
+            EnableRotatingBars = Config.EnableRotatingBars,
+            EnableJumpPads = Config.EnableJumpPads,
+            EnableSlime = Config.EnableSlime,
+            EnablePunchingGloves = Config.EnablePunchingGloves,
+            EnableQuizGates = Config.EnableQuizGates,
+            EnableElevators = Config.EnableElevators,
+            EnableDisappearingBridge = Config.EnableDisappearingBridge,
+            EnableConveyorBelt = Config.EnableConveyorBelt,
+            EnableElectricFloor = Config.EnableElectricFloor,
+            EnableRollingBoulder = Config.EnableRollingBoulder,
+
+            -- 밸런스
+            ObstacleSpeed = Config.ObstacleSpeed,
+            SlimeSlowFactor = Config.SlimeSlowFactor,
+        }
+        Events.AdminCommand:FireClient(player, "ConfigData", configData)
+
+    elseif command == "setconfig" then
+        -- 설정 변경
+        local key = args[1]
+        local value = args[2]
+
+        if not key then
+            Events.AdminCommand:FireClient(player, "Error", "Usage: setconfig <key> <value>")
+            return
+        end
+
+        -- 허용된 설정 키 목록
+        local allowedKeys = {
+            "MIN_PLAYERS", "MAX_PLAYERS", "LOBBY_COUNTDOWN", "INTERMISSION",
+            "EnableRotatingBars", "EnableJumpPads", "EnableSlime", "EnablePunchingGloves",
+            "EnableQuizGates", "EnableElevators", "EnableDisappearingBridge",
+            "EnableConveyorBelt", "EnableElectricFloor", "EnableRollingBoulder",
+            "ObstacleSpeed", "SlimeSlowFactor"
+        }
+
+        if not table.find(allowedKeys, key) then
+            Events.AdminCommand:FireClient(player, "Error", "Invalid config key: " .. key)
+            return
+        end
+
+        -- 타입 변환
+        local oldValue = Config[key]
+        local newValue
+
+        if type(oldValue) == "boolean" then
+            newValue = (value == "true" or value == "1" or value == true)
+        elseif type(oldValue) == "number" then
+            newValue = tonumber(value)
+            if not newValue then
+                Events.AdminCommand:FireClient(player, "Error", "Invalid number value")
+                return
+            end
+        else
+            newValue = value
+        end
+
+        -- 값 적용
+        Config[key] = newValue
+
+        Events.AdminCommand:FireClient(player, "Success",
+            string.format("Config changed: %s = %s (was %s)", key, tostring(newValue), tostring(oldValue)))
+        print(string.format("⚙️ Admin %s changed config: %s = %s", player.Name, key, tostring(newValue)))
+
+        -- 모든 클라이언트에 설정 업데이트 알림
+        Events.ConfigUpdate:FireAllClients(key, newValue)
     end
 end)
 

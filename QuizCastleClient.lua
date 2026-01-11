@@ -60,6 +60,7 @@ local Events = {
     LevelUp = remoteFolder:WaitForChild("LevelUp"),
     TrailUpdate = remoteFolder:WaitForChild("TrailUpdate"),
     AdminCommand = remoteFolder:WaitForChild("AdminCommand"),
+    ConfigUpdate = remoteFolder:WaitForChild("ConfigUpdate"),
 }
 
 print("🎮 Quiz Castle v3.2 Client Loading...")
@@ -1596,6 +1597,260 @@ CreateButton("🔥 하드모드 코스로 변경", Color3.fromRGB(180, 60, 60), 
     Events.AdminCommand:FireServer("setcourse", "hardmode", "library")
 end)
 
+-- Section: Game Settings
+CreateSection("⚙️ 게임 설정")
+
+-- Settings container
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Name = "SettingsFrame"
+settingsFrame.Size = UDim2.new(1, 0, 0, 300)
+settingsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+settingsFrame.BorderSizePixel = 0
+settingsFrame.Parent = contentFrame
+
+local settingsCorner = Instance.new("UICorner")
+settingsCorner.CornerRadius = UDim.new(0, 8)
+settingsCorner.Parent = settingsFrame
+
+local settingsScroll = Instance.new("ScrollingFrame")
+settingsScroll.Size = UDim2.new(1, -10, 1, -10)
+settingsScroll.Position = UDim2.new(0, 5, 0, 5)
+settingsScroll.BackgroundTransparency = 1
+settingsScroll.ScrollBarThickness = 4
+settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 500)
+settingsScroll.Parent = settingsFrame
+
+local settingsLayout = Instance.new("UIListLayout")
+settingsLayout.Padding = UDim.new(0, 5)
+settingsLayout.Parent = settingsScroll
+
+-- Current config cache
+local currentConfig = {}
+
+-- Helper to create a toggle setting
+local function CreateToggleSetting(key, label)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -10, 0, 30)
+    row.BackgroundColor3 = Color3.fromRGB(45, 45, 75)
+    row.BorderSizePixel = 0
+    row.Parent = settingsScroll
+
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = UDim.new(0, 6)
+    rowCorner.Parent = row
+
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0.7, 0, 1, 0)
+    labelText.Position = UDim2.new(0, 10, 0, 0)
+    labelText.BackgroundTransparency = 1
+    labelText.Text = label
+    labelText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    labelText.TextSize = 11
+    labelText.Font = Enum.Font.Gotham
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = row
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Name = key
+    toggleBtn.Size = UDim2.new(0, 50, 0, 22)
+    toggleBtn.Position = UDim2.new(1, -60, 0.5, -11)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    toggleBtn.Text = "OFF"
+    toggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    toggleBtn.TextSize = 10
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.Parent = row
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 4)
+    toggleCorner.Parent = toggleBtn
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        local newValue = not currentConfig[key]
+        Events.AdminCommand:FireServer("setconfig", key, tostring(newValue))
+    end)
+
+    return toggleBtn
+end
+
+-- Helper to create a number setting
+local function CreateNumberSetting(key, label, min, max, step)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -10, 0, 30)
+    row.BackgroundColor3 = Color3.fromRGB(45, 45, 75)
+    row.BorderSizePixel = 0
+    row.Parent = settingsScroll
+
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = UDim.new(0, 6)
+    rowCorner.Parent = row
+
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0.5, 0, 1, 0)
+    labelText.Position = UDim2.new(0, 10, 0, 0)
+    labelText.BackgroundTransparency = 1
+    labelText.Text = label
+    labelText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    labelText.TextSize = 11
+    labelText.Font = Enum.Font.Gotham
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = row
+
+    local minusBtn = Instance.new("TextButton")
+    minusBtn.Size = UDim2.new(0, 24, 0, 22)
+    minusBtn.Position = UDim2.new(1, -100, 0.5, -11)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 80)
+    minusBtn.Text = "-"
+    minusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minusBtn.TextSize = 14
+    minusBtn.Font = Enum.Font.GothamBold
+    minusBtn.Parent = row
+
+    local minusBtnCorner = Instance.new("UICorner")
+    minusBtnCorner.CornerRadius = UDim.new(0, 4)
+    minusBtnCorner.Parent = minusBtn
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Name = key
+    valueLabel.Size = UDim2.new(0, 40, 0, 22)
+    valueLabel.Position = UDim2.new(1, -74, 0.5, -11)
+    valueLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    valueLabel.Text = "0"
+    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valueLabel.TextSize = 11
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.Parent = row
+
+    local valueLabelCorner = Instance.new("UICorner")
+    valueLabelCorner.CornerRadius = UDim.new(0, 4)
+    valueLabelCorner.Parent = valueLabel
+
+    local plusBtn = Instance.new("TextButton")
+    plusBtn.Size = UDim2.new(0, 24, 0, 22)
+    plusBtn.Position = UDim2.new(1, -32, 0.5, -11)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
+    plusBtn.Text = "+"
+    plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    plusBtn.TextSize = 14
+    plusBtn.Font = Enum.Font.GothamBold
+    plusBtn.Parent = row
+
+    local plusBtnCorner = Instance.new("UICorner")
+    plusBtnCorner.CornerRadius = UDim.new(0, 4)
+    plusBtnCorner.Parent = plusBtn
+
+    minusBtn.MouseButton1Click:Connect(function()
+        local current = currentConfig[key] or 0
+        local newValue = math.max(min, current - step)
+        Events.AdminCommand:FireServer("setconfig", key, tostring(newValue))
+    end)
+
+    plusBtn.MouseButton1Click:Connect(function()
+        local current = currentConfig[key] or 0
+        local newValue = math.min(max, current + step)
+        Events.AdminCommand:FireServer("setconfig", key, tostring(newValue))
+    end)
+
+    return valueLabel
+end
+
+-- Create subsection label
+local function CreateSubsection(text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(150, 180, 255)
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = settingsScroll
+end
+
+-- Load settings button
+local loadSettingsBtn = Instance.new("TextButton")
+loadSettingsBtn.Size = UDim2.new(1, -10, 0, 30)
+loadSettingsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
+loadSettingsBtn.Text = "🔄 설정 불러오기"
+loadSettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadSettingsBtn.TextSize = 12
+loadSettingsBtn.Font = Enum.Font.GothamMedium
+loadSettingsBtn.Parent = settingsScroll
+
+local loadSettingsBtnCorner = Instance.new("UICorner")
+loadSettingsBtnCorner.CornerRadius = UDim.new(0, 6)
+loadSettingsBtnCorner.Parent = loadSettingsBtn
+
+loadSettingsBtn.MouseButton1Click:Connect(function()
+    Events.AdminCommand:FireServer("getconfig")
+end)
+
+-- Subsection: Game
+CreateSubsection("🎮 게임")
+local minPlayersCtrl = CreateNumberSetting("MIN_PLAYERS", "최소 플레이어", 1, 10, 1)
+local lobbyCountdownCtrl = CreateNumberSetting("LOBBY_COUNTDOWN", "로비 카운트다운", 5, 60, 5)
+local intermissionCtrl = CreateNumberSetting("INTERMISSION", "인터미션", 5, 60, 5)
+
+-- Subsection: Obstacles
+CreateSubsection("🚧 장애물 활성화")
+local toggleRotatingBars = CreateToggleSetting("EnableRotatingBars", "🔄 회전 막대")
+local toggleJumpPads = CreateToggleSetting("EnableJumpPads", "⬆️ 점프 패드")
+local toggleSlime = CreateToggleSetting("EnableSlime", "💚 슬라임")
+local togglePunching = CreateToggleSetting("EnablePunchingGloves", "👊 펀칭 글러브")
+local toggleQuizGates = CreateToggleSetting("EnableQuizGates", "❓ 퀴즈 게이트")
+local toggleElevators = CreateToggleSetting("EnableElevators", "🛗 엘리베이터")
+local toggleBridge = CreateToggleSetting("EnableDisappearingBridge", "🌉 사라지는 다리")
+local toggleConveyor = CreateToggleSetting("EnableConveyorBelt", "➡️ 컨베이어")
+local toggleElectric = CreateToggleSetting("EnableElectricFloor", "⚡ 전기 바닥")
+local toggleBoulder = CreateToggleSetting("EnableRollingBoulder", "🪨 굴러오는 바위")
+
+-- Subsection: Balance
+CreateSubsection("⚖️ 밸런스")
+local obstacleSpeedCtrl = CreateNumberSetting("ObstacleSpeed", "장애물 속도", 0.5, 3.0, 0.1)
+local slimeSlowCtrl = CreateNumberSetting("SlimeSlowFactor", "슬라임 감속", 0.1, 0.9, 0.1)
+
+-- Update UI when config is received
+local function UpdateSettingsUI(config)
+    currentConfig = config
+
+    -- Update number controls
+    if minPlayersCtrl then minPlayersCtrl.Text = tostring(config.MIN_PLAYERS or 1) end
+    if lobbyCountdownCtrl then lobbyCountdownCtrl.Text = tostring(config.LOBBY_COUNTDOWN or 15) end
+    if intermissionCtrl then intermissionCtrl.Text = tostring(config.INTERMISSION or 20) end
+    if obstacleSpeedCtrl then obstacleSpeedCtrl.Text = string.format("%.1f", config.ObstacleSpeed or 1.0) end
+    if slimeSlowCtrl then slimeSlowCtrl.Text = string.format("%.1f", config.SlimeSlowFactor or 0.4) end
+
+    -- Update toggle controls
+    local toggles = {
+        {ctrl = toggleRotatingBars, key = "EnableRotatingBars"},
+        {ctrl = toggleJumpPads, key = "EnableJumpPads"},
+        {ctrl = toggleSlime, key = "EnableSlime"},
+        {ctrl = togglePunching, key = "EnablePunchingGloves"},
+        {ctrl = toggleQuizGates, key = "EnableQuizGates"},
+        {ctrl = toggleElevators, key = "EnableElevators"},
+        {ctrl = toggleBridge, key = "EnableDisappearingBridge"},
+        {ctrl = toggleConveyor, key = "EnableConveyorBelt"},
+        {ctrl = toggleElectric, key = "EnableElectricFloor"},
+        {ctrl = toggleBoulder, key = "EnableRollingBoulder"},
+    }
+
+    for _, toggle in ipairs(toggles) do
+        local enabled = config[toggle.key]
+        if enabled then
+            toggle.ctrl.Text = "ON"
+            toggle.ctrl.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
+        else
+            toggle.ctrl.Text = "OFF"
+            toggle.ctrl.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        end
+    end
+end
+
+-- Update settings layout canvas size
+settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, settingsLayout.AbsoluteContentSize.Y + 10)
+end)
+
 -- Status Label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
@@ -1725,9 +1980,23 @@ Events.AdminCommand.OnClientEvent:Connect(function(action, data)
         ShowStatus("✅ " .. data)
         Events.AdminCommand:FireServer("courseinfo")  -- Refresh course info
 
+    elseif action == "ConfigData" then
+        -- Received config data
+        UpdateSettingsUI(data)
+        ShowStatus("⚙️ 설정을 불러왔습니다")
+
     elseif action == "Error" then
         ShowStatus("❌ " .. data, true)
     end
+end)
+
+-- Handle config updates from server
+Events.ConfigUpdate.OnClientEvent:Connect(function(key, value)
+    -- Update local config cache
+    currentConfig[key] = value
+
+    -- Refresh the settings UI
+    UpdateSettingsUI(currentConfig)
 end)
 
 -- ============================================
