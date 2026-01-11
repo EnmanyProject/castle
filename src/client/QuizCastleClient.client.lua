@@ -219,6 +219,24 @@ raceInfo.TextStrokeColor3 = Color3.new(0, 0, 0)
 raceInfo.Visible = false
 raceInfo.Parent = screenGui
 
+-- 🚀 속도 표시 (raceInfo 아래)
+local speedIndicator = Instance.new("TextLabel")
+speedIndicator.Name = "SpeedIndicator"
+speedIndicator.Size = UDim2.new(0, 200, 0, 35)
+speedIndicator.Position = UDim2.new(0.5, -100, 0, 85)  -- raceInfo 아래
+speedIndicator.BackgroundTransparency = 1
+speedIndicator.Text = "🚀 100%"
+speedIndicator.TextSize = 28
+speedIndicator.Font = Enum.Font.GothamBlack
+speedIndicator.TextColor3 = Color3.fromRGB(100, 255, 100)  -- 녹색 (기본)
+speedIndicator.TextStrokeTransparency = 0
+speedIndicator.TextStrokeColor3 = Color3.new(0, 0, 0)
+speedIndicator.Visible = false
+speedIndicator.Parent = screenGui
+
+-- 속도 표시 상태
+local currentSpeedPercent = 100
+
 -- 🏆 TOP 10 (오른쪽) - 완전 투명, 텍스트만
 local leaderboardFrame = Instance.new("Frame")
 leaderboardFrame.Name = "LeaderboardFrame"
@@ -402,39 +420,59 @@ progressIcon.Text = "🏃"
 progressIcon.TextSize = 16
 progressIcon.Parent = progressContainer
 
--- Item Slot (Bottom Left) - 투명 배경
+-- 🎰 Item Slot (화면 중앙 - 마리오카트 스타일)
 local itemSlot = Instance.new("Frame")
 itemSlot.Name = "ItemSlot"
-itemSlot.Size = UDim2.new(0, 70, 0, 70)
-itemSlot.Position = UDim2.new(0, 15, 1, -90)
-itemSlot.BackgroundTransparency = 1
+itemSlot.Size = UDim2.new(0, 120, 0, 120)
+itemSlot.Position = UDim2.new(0.5, -60, 0.5, -60)  -- 화면 정중앙
+itemSlot.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+itemSlot.BackgroundTransparency = 0.3
 itemSlot.BorderSizePixel = 0
-itemSlot.Visible = false  -- 레이스 시작 전까지 숨김
+itemSlot.Visible = false  -- 아이템 없으면 숨김
 itemSlot.Parent = screenGui
 
+-- 둥근 모서리
+local itemSlotCorner = Instance.new("UICorner")
+itemSlotCorner.CornerRadius = UDim.new(0, 15)
+itemSlotCorner.Parent = itemSlot
+
+-- 테두리 효과
+local itemSlotStroke = Instance.new("UIStroke")
+itemSlotStroke.Color = Color3.fromRGB(255, 215, 0)
+itemSlotStroke.Thickness = 4
+itemSlotStroke.Transparency = 0.3
+itemSlotStroke.Parent = itemSlot
+
+-- 아이템 아이콘
 local itemIcon = Instance.new("TextLabel")
 itemIcon.Name = "Icon"
-itemIcon.Size = UDim2.new(1, 0, 1, -18)
+itemIcon.Size = UDim2.new(1, 0, 1, -25)
 itemIcon.Position = UDim2.new(0, 0, 0, 0)
 itemIcon.BackgroundTransparency = 1
 itemIcon.Text = ""
-itemIcon.TextSize = 40
+itemIcon.TextSize = 60
 itemIcon.Font = Enum.Font.GothamBold
 itemIcon.TextColor3 = Color3.new(1, 1, 1)
-itemIcon.TextStrokeTransparency = 0.3
+itemIcon.TextStrokeTransparency = 0
+itemIcon.TextStrokeColor3 = Color3.new(0, 0, 0)
 itemIcon.Parent = itemSlot
 
+-- 키 힌트 (Q)
 local itemKey = Instance.new("TextLabel")
 itemKey.Name = "KeyHint"
-itemKey.Size = UDim2.new(1, 0, 0, 18)
-itemKey.Position = UDim2.new(0, 0, 1, -18)
+itemKey.Size = UDim2.new(1, 0, 0, 25)
+itemKey.Position = UDim2.new(0, 0, 1, -25)
 itemKey.BackgroundTransparency = 1
-itemKey.Text = "[Q]"
-itemKey.TextSize = 12
-itemKey.Font = Enum.Font.Gotham
-itemKey.TextColor3 = Color3.fromRGB(200, 200, 200)
-itemKey.TextStrokeTransparency = 0.5
+itemKey.Text = "[ Q ]"
+itemKey.TextSize = 16
+itemKey.Font = Enum.Font.GothamBold
+itemKey.TextColor3 = Color3.fromRGB(255, 215, 0)
+itemKey.TextStrokeTransparency = 0
+itemKey.TextStrokeColor3 = Color3.new(0, 0, 0)
 itemKey.Parent = itemSlot
+
+-- 아이템 보유 상태
+local hasItem = false
 
 -- Title Banner (Top Center, for announcements) - 완전 투명
 local titleBanner = Instance.new("Frame")
@@ -714,7 +752,7 @@ local function ShowEffectMessage(text, duration, color)
     effectMessage.TextColor3 = color or Color3.fromRGB(255, 100, 100)
     effectMessage.TextTransparency = 0
     effectMessage.Visible = true
-    
+
     task.delay(duration or 2, function()
         local fade = TweenService:Create(effectMessage, TweenInfo.new(0.5), {TextTransparency = 1})
         fade:Play()
@@ -722,6 +760,51 @@ local function ShowEffectMessage(text, duration, color)
             effectMessage.Visible = false
         end)
     end)
+end
+
+-- 🚀 속도 표시 업데이트 함수
+local function UpdateSpeedIndicator(percent, isSpeedUp)
+    currentSpeedPercent = percent or 100
+    speedIndicator.Text = string.format("🚀 %d%%", currentSpeedPercent)
+
+    -- 속도에 따른 색상 변경
+    if currentSpeedPercent > 100 then
+        -- 가속 중: 녹색 → 청록색 (속도에 따라)
+        local boost = math.min((currentSpeedPercent - 100) / 100, 1)  -- 0~1
+        speedIndicator.TextColor3 = Color3.fromRGB(
+            math.floor(100 - boost * 100),  -- R: 100 → 0
+            255,                             -- G: 255
+            math.floor(100 + boost * 155)   -- B: 100 → 255
+        )
+    else
+        -- 기본 속도: 흰색
+        speedIndicator.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+
+    -- 속도 변화 애니메이션
+    if isSpeedUp ~= nil then
+        local originalSize = speedIndicator.TextSize
+        speedIndicator.TextSize = 40  -- 커졌다가
+        local shrinkTween = TweenService:Create(speedIndicator, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            TextSize = originalSize
+        })
+        shrinkTween:Play()
+
+        -- 가속/감속에 따른 색상 플래시
+        if isSpeedUp then
+            speedIndicator.TextColor3 = Color3.fromRGB(100, 255, 100)  -- 녹색 플래시
+        else
+            speedIndicator.TextColor3 = Color3.fromRGB(255, 100, 100)  -- 빨간색 플래시
+            task.delay(0.3, function()
+                -- 플래시 후 원래 색상으로
+                if currentSpeedPercent > 100 then
+                    speedIndicator.TextColor3 = Color3.fromRGB(0, 255, 200)
+                else
+                    speedIndicator.TextColor3 = Color3.fromRGB(255, 255, 255)
+                end
+            end)
+        end
+    end
 end
 
 local function UpdateLeaderboard(data)
@@ -756,19 +839,127 @@ local function UpdateLeaderboard(data)
     end
 end
 
-local function UpdateItem(itemName)
+-- 아이템 아이콘 매핑 (전역)
+local itemIcons = {
+    Booster = "🚀",
+    Shield = "🛡️",
+    Banana = "🍌",
+    Lightning = "⚡",
+    Teleport = "🌀",
+    PunchingGlove = "🥊",
+}
+
+-- 아이템 목록 (룰렛용)
+local itemList = {"Banana", "Booster", "Shield", "Lightning"}
+
+-- 🎰 마리오카트 스타일 룰렛 효과 (화면 중앙)
+local isRouletteRunning = false
+local BASE_ICON_SIZE = 60
+
+local function StartItemRoulette(finalItem, callback)
+    if isRouletteRunning then return end
+    isRouletteRunning = true
+    hasItem = true
+
+    -- 아이템 슬롯 표시 (화면 중앙에 나타남)
+    itemSlot.Visible = true
+    itemSlot.Size = UDim2.new(0, 120, 0, 120)
+    itemSlot.Position = UDim2.new(0.5, -60, 0.5, -60)
+
+    -- 등장 애니메이션
+    itemSlot.BackgroundTransparency = 1
+    itemSlotStroke.Transparency = 1
+    local appearTween = TweenService:Create(itemSlot, TweenInfo.new(0.2), {
+        BackgroundTransparency = 0.3
+    })
+    local strokeAppear = TweenService:Create(itemSlotStroke, TweenInfo.new(0.2), {
+        Transparency = 0.3
+    })
+    appearTween:Play()
+    strokeAppear:Play()
+
+    local rouletteDuration = 2  -- 2초 동안 룰렛
+    local startTime = tick()
+    local spinCount = 0
+
+    task.spawn(function()
+        while tick() - startTime < rouletteDuration do
+            spinCount = spinCount + 1
+
+            -- 랜덤 아이템 표시
+            local randomItem = itemList[math.random(#itemList)]
+            itemIcon.Text = itemIcons[randomItem] or "❓"
+
+            -- 점점 느려지는 효과
+            local progress = (tick() - startTime) / rouletteDuration
+            local delay = 0.05 + (progress * 0.15)  -- 0.05초 → 0.2초로 점점 느려짐
+
+            -- 크기 변화 효과 (흔들리는 느낌)
+            local scale = 1 + math.sin(spinCount * 0.5) * 0.15
+            itemIcon.TextSize = math.floor(BASE_ICON_SIZE * scale)
+
+            -- 테두리 색상 변화 (무지개)
+            local hue = (spinCount * 0.1) % 1
+            itemSlotStroke.Color = Color3.fromHSV(hue, 1, 1)
+
+            task.wait(delay)
+        end
+
+        -- 최종 아이템 표시
+        itemIcon.Text = itemIcons[finalItem] or "❓"
+        itemIcon.TextSize = BASE_ICON_SIZE
+
+        -- 테두리 금색으로 고정
+        itemSlotStroke.Color = Color3.fromRGB(255, 215, 0)
+
+        -- 확정 효과 (크게 했다가 원래대로 + 흔들림)
+        itemIcon.TextSize = 80
+        task.wait(0.1)
+        itemIcon.TextSize = BASE_ICON_SIZE
+
+        isRouletteRunning = false
+
+        if callback then callback() end
+    end)
+end
+
+local function UpdateItem(itemName, useRoulette)
     PlayerState.currentItem = itemName
-    
-    local itemIcons = {
-        SpeedBoost = "🚀",
-        Shield = "🛡️",
-        Banana = "🍌",
-        Lightning = "⚡",
-        Teleport = "🌀",
-        PunchingGlove = "🥊",
-    }
-    
-    itemIcon.Text = itemIcons[itemName] or ""
+
+    if itemName == nil then
+        -- 아이템 사용됨 - 사라지는 애니메이션
+        hasItem = false
+        local disappearTween = TweenService:Create(itemSlot, TweenInfo.new(0.3), {
+            BackgroundTransparency = 1
+        })
+        local strokeDisappear = TweenService:Create(itemSlotStroke, TweenInfo.new(0.3), {
+            Transparency = 1
+        })
+        local iconFade = TweenService:Create(itemIcon, TweenInfo.new(0.3), {
+            TextTransparency = 1
+        })
+        disappearTween:Play()
+        strokeDisappear:Play()
+        iconFade:Play()
+        disappearTween.Completed:Connect(function()
+            itemSlot.Visible = false
+            itemIcon.Text = ""
+            itemIcon.TextTransparency = 0
+        end)
+        return
+    end
+
+    if useRoulette then
+        StartItemRoulette(itemName)
+    else
+        -- 룰렛 없이 바로 표시 (직접 지급 등)
+        hasItem = true
+        itemSlot.Visible = true
+        itemSlot.BackgroundTransparency = 0.3
+        itemSlotStroke.Transparency = 0.3
+        itemIcon.Text = itemIcons[itemName] or ""
+        itemIcon.TextSize = BASE_ICON_SIZE
+    end
 end
 
 local function UpdateProgress(progress)
@@ -999,16 +1190,26 @@ end)
 
 Events.ItemEffect.OnClientEvent:Connect(function(action, data)
     data = data or {}
-    
+
     -- 서버에서 action, data 두 개로 보냄
     if action == "GotItem" then
-        -- 아이템 획득
-        UpdateItem(data.itemType)
-        ShowEffectMessage("📦 " .. (data.itemType or "Item") .. " 획득! [Q]로 사용", 2, Color3.fromRGB(100, 200, 255))
+        -- 아이템 획득 - 마리오카트 스타일 룰렛!
+        UpdateItem(data.itemType, true)  -- 룰렛 효과 사용
+        ShowEffectMessage("🎰 아이템 획득!", 2, Color3.fromRGB(100, 200, 255))
     elseif action == "ItemUsed" then
         -- 아이템 사용됨 - UI에서 제거
         UpdateItem(nil)
+    elseif action == "SpeedUp" then
+        -- 🚀 퀴즈 정답: 가속!
+        quizContainer.Visible = false
+        UpdateSpeedIndicator(data.speedPercent, true)
+        ShowEffectMessage(data.message or "🚀 가속!", 1.5, Color3.fromRGB(100, 255, 100))
+    elseif action == "SpeedDown" then
+        -- 💥 장애물 충돌: 감속!
+        UpdateSpeedIndicator(data.speedPercent, false)
+        ShowEffectMessage(data.message or "💥 감속!", 1.5, Color3.fromRGB(255, 100, 100))
     elseif action == "SpeedBoost" then
+        -- 아이템 부스터 (기존)
         ShowEffectMessage("🚀 SPEED BOOST!", 2, Color3.fromRGB(0, 200, 255))
     elseif action == "Shielded" then
         ShowEffectMessage("🛡️ SHIELD ACTIVE!", 2, Color3.fromRGB(100, 200, 255))
@@ -1032,6 +1233,10 @@ Events.ItemEffect.OnClientEvent:Connect(function(action, data)
         ShowEffectMessage("❌ WRONG!", 1.5, Color3.fromRGB(255, 100, 100))
     elseif action == "LavaFall" then
         ShowEffectMessage("🔥 LAVA!", 1, Color3.fromRGB(255, 100, 0))
+    elseif action == "HighJump" then
+        ShowEffectMessage("🚀 HIGH JUMP!", 1.5, Color3.fromRGB(255, 200, 0))
+    elseif action == "Reward" then
+        ShowEffectMessage(data.message or "⭐ BONUS!", 2, Color3.fromRGB(255, 215, 0))
     end
 end)
 
@@ -1093,7 +1298,12 @@ Events.RoundUpdate.OnClientEvent:Connect(function(eventType, data)
         raceInfo.Visible = true
         leaderboardFrame.Visible = true
         progressContainer.Visible = true
-        itemSlot.Visible = true  -- 아이템 슬롯 표시
+        -- 아이템 슬롯은 아이템 획득 시에만 표시 (마리오카트 스타일)
+        itemSlot.Visible = false
+        hasItem = false
+        -- 🚀 속도 표시 초기화 및 표시
+        speedIndicator.Visible = true
+        UpdateSpeedIndicator(100, nil)  -- 100%로 리셋 (애니메이션 없음)
         ShowBanner("🏁 GO!", 2, Color3.fromRGB(100, 255, 100))
         -- 컨트롤 안내 표시
         task.delay(2.5, function()
@@ -1116,6 +1326,8 @@ Events.RoundUpdate.OnClientEvent:Connect(function(eventType, data)
         progressContainer.Visible = false
         quizContainer.Visible = false
         itemSlot.Visible = false  -- 아이템 슬롯 숨김
+        hasItem = false
+        speedIndicator.Visible = false  -- 속도 표시 숨김
         ShowBanner("🏁 RACE COMPLETE!", 3, Color3.fromRGB(255, 215, 0))
         
         -- 결과 리더보드 업데이트

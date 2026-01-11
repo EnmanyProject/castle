@@ -116,19 +116,28 @@ if not lobbySpawn then
     print("🚩 Created: LobbySpawn")
 end
 
--- 레이스 스타트 위치
+-- 레이스 스타트 위치 (스폰이 아닌 일반 파트)
 local raceStart = Workspace:FindFirstChild("RaceStart")
 if not raceStart then
     raceStart = Instance.new("Part")
     raceStart.Name = "RaceStart"
     raceStart.Size = Vector3.new(30, 1, 10)
-    raceStart.Position = Vector3.new(0, 0, 0)
+    raceStart.Position = Vector3.new(0, 0, 20)  -- 로비에서 떨어진 위치
     raceStart.Anchored = true
     raceStart.Transparency = 0.5
     raceStart.BrickColor = BrickColor.new("Bright green")
     raceStart.Material = Enum.Material.Neon
+    raceStart.CanCollide = true
     raceStart.Parent = Workspace
     print("🏁 Created: RaceStart")
+end
+
+-- 기존 SpawnLocation 제거 (기본 스폰 제거)
+for _, obj in ipairs(Workspace:GetChildren()) do
+    if obj:IsA("SpawnLocation") and obj.Name ~= "LobbySpawn" then
+        obj:Destroy()
+        print("🗑️ Removed extra SpawnLocation:", obj.Name)
+    end
 end
 
 -- 트랙 (기본 바닥)
