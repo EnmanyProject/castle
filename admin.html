@@ -72,13 +72,21 @@
         }
 
         .tab-content {
-            display: none;
+            display: none !important;
             height: calc(100vh - 120px);
             overflow: hidden;
         }
 
         .tab-content.active {
-            display: block;
+            display: block !important;
+        }
+
+        #tab-course-editor.active {
+            display: grid !important;
+        }
+
+        #tab-quiz-pool.active {
+            display: grid !important;
         }
 
         /* Common Buttons */
