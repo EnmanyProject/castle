@@ -593,6 +593,198 @@
             border: 2px solid #4a4a8a;
         }
 
+        /* 3D Preview */
+        #preview3DCanvas {
+            width: 100%;
+            height: 500px;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        .preview3d-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .preview3d-controls button {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #4a4a8a;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preview3d-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .preview3d-controls button.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: transparent;
+        }
+
+        .preview3d-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        /* 2D Preview */
+        .preview-container {
+            position: relative;
+            background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 60%, #228B22 60%, #228B22 100%);
+            border-radius: 8px;
+            overflow: hidden;
+            height: 500px;
+        }
+
+        .preview-canvas-wrapper {
+            width: 100%;
+            height: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .preview-canvas {
+            height: 100%;
+            min-width: 100%;
+            position: relative;
+        }
+
+        .preview-track {
+            position: absolute;
+            bottom: 80px;
+            height: 60px;
+            background: linear-gradient(180deg, #555 0%, #333 100%);
+            border-top: 4px solid #666;
+            border-bottom: 4px solid #222;
+        }
+
+        .preview-track-lines {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: repeating-linear-gradient(90deg, #fff 0px, #fff 30px, transparent 30px, transparent 60px);
+            transform: translateY(-50%);
+            opacity: 0.5;
+        }
+
+        .preview-start {
+            position: absolute;
+            bottom: 140px;
+            left: 30px;
+            background: linear-gradient(135deg, #38ef7d, #11998e);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .preview-finish {
+            position: absolute;
+            bottom: 140px;
+            background: linear-gradient(135deg, #f5576c, #f093fb);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .preview-gimmick {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .preview-gimmick:hover { transform: scale(1.1); }
+
+        .preview-gimmick-icon {
+            font-size: 2rem;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+        }
+
+        .preview-gimmick-label {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            margin-top: 4px;
+        }
+
+        .preview-zone {
+            position: absolute;
+            bottom: 140px;
+            opacity: 0.6;
+            border-radius: 4px;
+        }
+
+        .preview-zone.slime { background: linear-gradient(180deg, #7FFF00 0%, #32CD32 100%); }
+        .preview-zone.conveyor { background: linear-gradient(180deg, #666 0%, #444 100%); }
+        .preview-zone.electric { background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%); }
+        .preview-zone.punching { background: linear-gradient(180deg, #DC143C 0%, #8B0000 100%); }
+
+        .preview-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .preview-control-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .preview-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            z-index: 10;
+        }
+
+        .preview-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -770,8 +962,9 @@
 
             <div class="view-toggle">
                 <button class="btn btn-primary" onclick="setView('2d')">2D 뷰</button>
-                <button class="btn btn-primary" onclick="setView('3d')">3D 뷰</button>
-                <button class="btn btn-warning" onclick="clearCourse()">🗑️ 초기화</button>
+                <button class="btn btn-warning" onclick="showPreviewModal()">👁️ 2D 프리뷰</button>
+                <button class="btn btn-success" onclick="show3DPreview()">🎮 3D 프리뷰</button>
+                <button class="btn btn-danger" onclick="clearCourse()">🗑️ 초기화</button>
             </div>
 
             <div id="track-view-2d" class="track-view-2d">
@@ -903,6 +1096,75 @@
                     <button class="btn btn-success" onclick="copyExport()">📋 복사</button>
                     <button class="btn btn-primary" onclick="downloadExport()">💾 다운로드</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2D Preview Modal -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal" style="max-width: 95%; width: 1200px;">
+            <div class="modal-header">
+                <span class="modal-title">👁️ 2D 코스 프리뷰</span>
+                <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+            </div>
+            <div class="preview-container" id="previewContainer">
+                <div class="preview-info">
+                    <span id="previewCourseName">My Course</span> |
+                    <span id="previewGimmickCount">0</span> gimmicks
+                </div>
+                <div class="preview-controls">
+                    <button class="preview-control-btn" onclick="zoomPreview(-1)" title="Zoom Out">−</button>
+                    <button class="preview-control-btn" onclick="zoomPreview(1)" title="Zoom In">+</button>
+                    <button class="preview-control-btn" onclick="resetPreviewZoom()" title="Reset">⟲</button>
+                </div>
+                <div class="preview-canvas-wrapper" id="previewWrapper">
+                    <div class="preview-canvas" id="previewCanvas">
+                        <div class="preview-track" id="previewTrack">
+                            <div class="preview-track-lines"></div>
+                        </div>
+                        <div class="preview-start">🏁 START</div>
+                        <div class="preview-finish" id="previewFinish">🎯 FINISH</div>
+                        <div id="previewGimmicks"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-legend">
+                <div class="legend-item"><span>🔄</span> 회전 막대</div>
+                <div class="legend-item"><span>🔺</span> 점프 패드</div>
+                <div class="legend-item"><span>👻</span> 슬라임</div>
+                <div class="legend-item"><span>🥊</span> 펀칭 복도</div>
+                <div class="legend-item"><span>🚪</span> 퀴즈 게이트</div>
+                <div class="legend-item"><span>🛗</span> 엘리베이터</div>
+                <div class="legend-item"><span>➡️</span> 컨베이어</div>
+                <div class="legend-item"><span>⚡</span> 전기 바닥</div>
+                <div class="legend-item"><span>🪨</span> 바위</div>
+                <div class="legend-item"><span>🌉</span> 사라지는 다리</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Preview Modal -->
+    <div class="modal-overlay" id="preview3DModal">
+        <div class="modal" style="max-width: 95%; width: 1400px;">
+            <div class="modal-header">
+                <span class="modal-title">🎮 3D 코스 프리뷰</span>
+                <button class="modal-close" onclick="close3DPreview()">&times;</button>
+            </div>
+            <div id="preview3DCanvas"></div>
+            <div class="preview3d-controls">
+                <button onclick="set3DCamera('quarter')" class="active" id="camQuarter">🎯 쿼터뷰</button>
+                <button onclick="set3DCamera('top')" id="camTop">⬇️ 탑뷰</button>
+                <button onclick="set3DCamera('side')" id="camSide">➡️ 사이드뷰</button>
+                <button onclick="set3DCamera('first')" id="camFirst">👤 1인칭</button>
+                <button onclick="toggle3DAnimation()" id="btnAnimate">▶️ 기믹 애니메이션</button>
+                <button onclick="reset3DCamera()">🔄 카메라 리셋</button>
+                <span style="border-left: 1px solid #4a4a8a; margin: 0 5px;"></span>
+                <button onclick="togglePlayerRun()" id="btnRun" style="background: linear-gradient(135deg, #f093fb, #f5576c);">🏃 플레이어 달리기</button>
+                <button onclick="toggleFollowCamera()" id="btnFollow">📹 카메라 추적</button>
+                <button onclick="resetPlayer()">↩️ 플레이어 리셋</button>
+            </div>
+            <div class="preview3d-info">
+                💡 마우스 드래그로 회전, 스크롤로 줌, 우클릭 드래그로 이동
             </div>
         </div>
     </div>
@@ -1088,9 +1350,273 @@
         }
 
         function init3DView() {
-            // Simplified 3D view
             const container = document.getElementById('track-view-3d');
-            container.innerHTML = '<p style="padding: 20px; color: #888;">3D 뷰는 준비 중입니다.</p>';
+            container.innerHTML = '<p style="padding: 20px; color: #888;">3D 프리뷰 버튼을 클릭하세요.</p>';
+        }
+
+        // ==================== 2D Preview ====================
+        let previewScale = 0.5;
+        const MIN_SCALE = 0.2;
+        const MAX_SCALE = 2;
+
+        function showPreviewModal() {
+            document.getElementById('previewModal').classList.add('active');
+            render2DPreview();
+        }
+
+        function closePreviewModal() {
+            document.getElementById('previewModal').classList.remove('active');
+        }
+
+        function zoomPreview(direction) {
+            previewScale += direction * 0.1;
+            previewScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, previewScale));
+            render2DPreview();
+        }
+
+        function resetPreviewZoom() {
+            previewScale = 0.5;
+            render2DPreview();
+        }
+
+        function getGimmickZ(gimmick) {
+            return gimmick.z || gimmick.triggerZ || gimmick.zStart || 0;
+        }
+
+        function render2DPreview() {
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 1500;
+            const canvasWidth = (courseLength + 200) * previewScale;
+
+            document.getElementById('previewCourseName').textContent = document.getElementById('courseName').value;
+            document.getElementById('previewGimmickCount').textContent = courseGimmicks.length;
+
+            const canvas = document.getElementById('previewCanvas');
+            canvas.style.width = `${Math.max(canvasWidth, 1000)}px`;
+
+            const track = document.getElementById('previewTrack');
+            track.style.left = `${50 * previewScale}px`;
+            track.style.width = `${courseLength * previewScale}px`;
+
+            const finish = document.getElementById('previewFinish');
+            finish.style.left = `${(courseLength + 30) * previewScale}px`;
+
+            const gimmicksContainer = document.getElementById('previewGimmicks');
+            gimmicksContainer.innerHTML = '';
+
+            courseGimmicks.forEach((gimmick, index) => {
+                const def = GIMMICK_DEFS[gimmick.type];
+                if (!def) return;
+
+                const z = getGimmickZ(gimmick);
+                const xPos = (z + 50) * previewScale;
+
+                if (gimmick.length !== undefined || gimmick.zEnd !== undefined) {
+                    const length = gimmick.length || (gimmick.zEnd - (gimmick.zStart || 0)) || 60;
+                    const zone = document.createElement('div');
+                    zone.className = 'preview-zone';
+
+                    if (gimmick.type === 'SlimeZone') zone.classList.add('slime');
+                    else if (gimmick.type === 'ConveyorBelt') zone.classList.add('conveyor');
+                    else if (gimmick.type === 'ElectricFloor') zone.classList.add('electric');
+                    else if (gimmick.type === 'PunchingCorridor') zone.classList.add('punching');
+                    else if (gimmick.type === 'RollingBoulder') {
+                        zone.style.background = 'linear-gradient(90deg, transparent, rgba(139,69,19,0.5), transparent)';
+                    }
+
+                    zone.style.left = `${xPos}px`;
+                    zone.style.width = `${length * previewScale}px`;
+                    zone.style.height = '50px';
+                    zone.title = `${def.displayName} (Z: ${z}, 길이: ${length})`;
+                    zone.onclick = () => { closePreviewModal(); selectGimmick(index); };
+
+                    const label = document.createElement('div');
+                    label.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;';
+                    label.textContent = def.icon;
+                    zone.appendChild(label);
+
+                    gimmicksContainer.appendChild(zone);
+                } else {
+                    const gimmickEl = document.createElement('div');
+                    gimmickEl.className = 'preview-gimmick';
+                    gimmickEl.style.left = `${xPos}px`;
+
+                    let bottomPos = 145;
+                    if (gimmick.type === 'RotatingBar') bottomPos = 150 + (gimmick.height || 3) * 5;
+                    else if (gimmick.type === 'JumpPad') bottomPos = 140;
+                    else if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator') bottomPos = 170;
+                    gimmickEl.style.bottom = `${bottomPos}px`;
+
+                    let tooltip = `${def.displayName} (Z: ${z})`;
+                    if (gimmick.id) tooltip += ` #${gimmick.id}`;
+                    if (gimmick.options) tooltip += ` [${gimmick.options}선택지]`;
+                    gimmickEl.title = tooltip;
+
+                    gimmickEl.onclick = () => { closePreviewModal(); selectGimmick(index); };
+
+                    const icon = document.createElement('div');
+                    icon.className = 'preview-gimmick-icon';
+                    icon.textContent = def.icon;
+                    gimmickEl.appendChild(icon);
+
+                    if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator' || gimmick.type === 'PortalMaze') {
+                        const labelEl = document.createElement('div');
+                        labelEl.className = 'preview-gimmick-label';
+                        labelEl.textContent = `#${gimmick.id} (${gimmick.options}개)`;
+                        gimmickEl.appendChild(labelEl);
+                    }
+
+                    gimmicksContainer.appendChild(gimmickEl);
+                }
+            });
+
+            for (let z = 0; z <= courseLength; z += 200) {
+                const marker = document.createElement('div');
+                marker.style.cssText = `position:absolute;bottom:60px;left:${(z + 50) * previewScale}px;transform:translateX(-50%);font-size:0.7rem;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px;`;
+                marker.textContent = `Z:${z}`;
+                gimmicksContainer.appendChild(marker);
+            }
+        }
+
+        // ==================== 3D Preview (Three.js) ====================
+        let scene3D, camera3D, renderer3D, controls3D;
+        let animating3D = false;
+        let animationId = null;
+        let gimmickMeshes = [];
+        const SCALE_3D = 0.05;
+
+        // Player state
+        let playerGroup = null;
+        let playerRunning = false;
+        let playerPosition = 0;
+        let playerSpeed = 0.15;
+        let playerBaseSpeed = 0.15;
+        let followCamera = false;
+        let runAnimationTime = 0;
+        let playerKnockback = 0;
+        let playerStunned = false;
+        let playerStunTime = 0;
+        let playerJumping = false;
+        let playerJumpVelocity = 0;
+        let playerYPosition = 0.1;
+        let playerSlowed = false;
+        let playerFlashing = false;
+        let playerFlashTime = 0;
+        let collisionCooldown = {};
+
+        const COLORS_3D = {
+            track: 0x444444, trackLine: 0xffffff, sky: 0x87CEEB, grass: 0x228B22,
+            rotatingBar: 0xff4444, jumpPad: 0x44ff44, slime: 0x7FFF00, quizGate: 0x4444ff,
+            elevator: 0x8844ff, conveyor: 0x666666, electric: 0xFFD700, punching: 0xDC143C,
+            boulder: 0x8B4513, bridge: 0x888888, start: 0x00ff00, finish: 0xff0000, portal: 0xff44ff
+        };
+
+        function show3DPreview() {
+            document.getElementById('preview3DModal').classList.add('active');
+            init3DScene();
+            render3DCourse();
+            animate3D();
+        }
+
+        function close3DPreview() {
+            document.getElementById('preview3DModal').classList.remove('active');
+            if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+            if (renderer3D) {
+                renderer3D.dispose();
+                document.getElementById('preview3DCanvas').innerHTML = '';
+            }
+            playerGroup = null; playerRunning = false; playerPosition = 0;
+            playerSpeed = playerBaseSpeed; followCamera = false; runAnimationTime = 0;
+            playerKnockback = 0; playerStunned = false; playerJumping = false;
+            playerJumpVelocity = 0; playerYPosition = 0.1; playerSlowed = false;
+            playerFlashing = false; collisionCooldown = {};
+        }
+
+        function init3DScene() {
+            const container = document.getElementById('preview3DCanvas');
+            container.innerHTML = '';
+            const width = container.clientWidth;
+            const height = 500;
+
+            scene3D = new THREE.Scene();
+            scene3D.background = new THREE.Color(0x87CEEB);
+            scene3D.fog = new THREE.Fog(0x87CEEB, 50, 200);
+
+            camera3D = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+            renderer3D = new THREE.WebGLRenderer({ antialias: true });
+            renderer3D.setSize(width, height);
+            renderer3D.shadowMap.enabled = true;
+            container.appendChild(renderer3D.domElement);
+
+            controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement);
+            controls3D.enableDamping = true;
+            controls3D.dampingFactor = 0.05;
+            controls3D.maxPolarAngle = Math.PI / 2;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene3D.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            scene3D.add(directionalLight);
+
+            set3DCamera('quarter');
+        }
+
+        function render3DCourse() {
+            gimmickMeshes.forEach(mesh => scene3D.remove(mesh));
+            gimmickMeshes = [];
+
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 1500;
+            const trackLength = courseLength * SCALE_3D;
+            const trackWidth = 30 * SCALE_3D;
+
+            // Ground
+            const groundGeometry = new THREE.PlaneGeometry(trackWidth * 3, trackLength + 20);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.grass });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(0, -0.1, trackLength / 2);
+            ground.receiveShadow = true;
+            scene3D.add(ground);
+            gimmickMeshes.push(ground);
+
+            // Track
+            const trackGeometry = new THREE.BoxGeometry(trackWidth, 0.2, trackLength);
+            const trackMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.track });
+            const track = new THREE.Mesh(trackGeometry, trackMaterial);
+            track.position.set(0, 0, trackLength / 2);
+            track.receiveShadow = true;
+            scene3D.add(track);
+            gimmickMeshes.push(track);
+
+            // Start/Finish markers
+            const startGeometry = new THREE.BoxGeometry(trackWidth, 0.5, 0.2);
+            const startMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.start });
+            const startMarker = new THREE.Mesh(startGeometry, startMaterial);
+            startMarker.position.set(0, 0.25, 0);
+            scene3D.add(startMarker);
+            gimmickMeshes.push(startMarker);
+
+            const finishGeometry = new THREE.BoxGeometry(trackWidth, 3, 0.2);
+            const finishMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.finish });
+            const finishMarker = new THREE.Mesh(finishGeometry, finishMaterial);
+            finishMarker.position.set(0, 1.5, trackLength);
+            scene3D.add(finishMarker);
+            gimmickMeshes.push(finishMarker);
+
+            // Render gimmicks
+            courseGimmicks.forEach((gimmick, index) => {
+                const mesh = create3DGimmick(gimmick, index);
+                if (mesh) {
+                    scene3D.add(mesh);
+                    gimmickMeshes.push(mesh);
+                }
+            });
+
+            controls3D.target.set(0, 1, trackLength / 2);
+            controls3D.update();
+            createPlayer();
         }
 
         function renderTrack() {
@@ -1609,6 +2135,420 @@
                 reader.readAsText(file);
             };
             input.click();
+        }
+
+        // ==================== 3D Gimmick Creation ====================
+        function create3DGimmick(gimmick, index) {
+            const z = (gimmick.z || gimmick.triggerZ || gimmick.zStart || 0) * SCALE_3D;
+            let mesh;
+
+            switch (gimmick.type) {
+                case 'RotatingBar': {
+                    const width = (gimmick.width || 28) * SCALE_3D;
+                    const height = (gimmick.height || 3) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(width, 0.15, 0.15);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.rotatingBar });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, height, z);
+                    mesh.castShadow = true;
+                    mesh.userData = { type: 'rotating', speed: gimmick.speed || 1.5 };
+                    break;
+                }
+                case 'JumpPad': {
+                    const geometry = new THREE.CylinderGeometry(0.4, 0.5, 0.1, 8);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.jumpPad });
+                    mesh = new THREE.Mesh(geometry, material);
+                    const x = (gimmick.x || 0) * SCALE_3D;
+                    mesh.position.set(x, 0.15, z);
+                    mesh.castShadow = true;
+                    break;
+                }
+                case 'SlimeZone': {
+                    const length = (gimmick.length || 80) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(1.4, 0.05, length);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.slime, transparent: true, opacity: 0.7 });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.12, z + length/2);
+                    break;
+                }
+                case 'QuizGate': {
+                    const group = new THREE.Group();
+                    const options = gimmick.options || 2;
+                    const gateWidth = 1.4 / options;
+                    for (let i = 0; i < options; i++) {
+                        const frameGeometry = new THREE.BoxGeometry(gateWidth - 0.05, 1.2, 0.1);
+                        const frameMaterial = new THREE.MeshLambertMaterial({ color: i === 0 ? 0x00ff00 : COLORS_3D.quizGate });
+                        const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+                        frame.position.x = (i - (options-1)/2) * gateWidth;
+                        frame.position.y = 0.6;
+                        frame.castShadow = true;
+                        group.add(frame);
+                    }
+                    const gateZ = (gimmick.gateZ || gimmick.triggerZ + 30) * SCALE_3D;
+                    group.position.set(0, 0, gateZ);
+                    mesh = group;
+                    break;
+                }
+                case 'Elevator': {
+                    const group = new THREE.Group();
+                    const options = gimmick.options || 3;
+                    const platWidth = 1.4 / options;
+                    for (let i = 0; i < options; i++) {
+                        const platGeometry = new THREE.BoxGeometry(platWidth - 0.05, 0.15, 0.6);
+                        const platMaterial = new THREE.MeshLambertMaterial({ color: i === 0 ? 0x00ff00 : COLORS_3D.elevator });
+                        const plat = new THREE.Mesh(platGeometry, platMaterial);
+                        plat.position.x = (i - (options-1)/2) * platWidth;
+                        plat.position.y = 0.15;
+                        plat.castShadow = true;
+                        group.add(plat);
+                    }
+                    const elevZ = (gimmick.elevZ || gimmick.triggerZ + 50) * SCALE_3D;
+                    group.position.set(0, 0, elevZ);
+                    mesh = group;
+                    break;
+                }
+                case 'ConveyorBelt': {
+                    const length = (gimmick.length || 60) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(1.2, 0.08, length);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.conveyor });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.14, z + length/2);
+                    break;
+                }
+                case 'ElectricFloor': {
+                    const length = (gimmick.length || 60) * SCALE_3D;
+                    const geometry = new THREE.BoxGeometry(1.4, 0.05, length);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.electric, emissive: COLORS_3D.electric, emissiveIntensity: 0.3 });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.12, z + length/2);
+                    mesh.userData = { type: 'electric' };
+                    break;
+                }
+                case 'PunchingCorridor': {
+                    const length = (gimmick.length || 100) * SCALE_3D;
+                    const group = new THREE.Group();
+                    const wallGeometry = new THREE.BoxGeometry(0.1, 0.8, length);
+                    const wallMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.punching });
+                    const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
+                    leftWall.position.set(-0.75, 0.4, 0);
+                    group.add(leftWall);
+                    const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
+                    rightWall.position.set(0.75, 0.4, 0);
+                    group.add(rightWall);
+                    group.position.set(0, 0, z + length/2);
+                    mesh = group;
+                    break;
+                }
+                case 'RollingBoulder': {
+                    const geometry = new THREE.SphereGeometry(0.4, 16, 16);
+                    const material = new THREE.MeshLambertMaterial({ color: COLORS_3D.boulder });
+                    mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(0, 0.5, z);
+                    mesh.castShadow = true;
+                    mesh.userData = { type: 'boulder', zStart: z, zEnd: (gimmick.zEnd || gimmick.zStart + 100) * SCALE_3D };
+                    break;
+                }
+                case 'DisappearingBridge': {
+                    const group = new THREE.Group();
+                    const count = gimmick.platformCount || 6;
+                    for (let i = 0; i < count; i++) {
+                        const platGeometry = new THREE.BoxGeometry(0.7, 0.1, 0.4);
+                        const platMaterial = new THREE.MeshLambertMaterial({ color: COLORS_3D.bridge, transparent: true, opacity: 0.8 });
+                        const plat = new THREE.Mesh(platGeometry, platMaterial);
+                        plat.position.x = (i % 2 === 0 ? -1 : 1) * 0.35;
+                        plat.position.y = 0.15;
+                        plat.position.z = i * 0.5;
+                        group.add(plat);
+                    }
+                    group.position.set(0, 0, z);
+                    mesh = group;
+                    break;
+                }
+                case 'PortalMaze': {
+                    const group = new THREE.Group();
+                    const options = gimmick.options || 3;
+                    const portalWidth = 1.4 / options;
+                    for (let i = 0; i < options; i++) {
+                        const portalGeometry = new THREE.TorusGeometry(0.25, 0.05, 8, 16);
+                        const portalMaterial = new THREE.MeshLambertMaterial({ color: i === 0 ? 0x00ff00 : COLORS_3D.portal });
+                        const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+                        portal.position.x = (i - (options-1)/2) * portalWidth;
+                        portal.position.y = 0.5;
+                        portal.rotation.y = Math.PI / 2;
+                        group.add(portal);
+                    }
+                    const portalZ = (gimmick.portalZ || gimmick.triggerZ + 40) * SCALE_3D;
+                    group.position.set(0, 0, portalZ);
+                    mesh = group;
+                    break;
+                }
+                default:
+                    return null;
+            }
+            return mesh;
+        }
+
+        // ==================== 3D Animation & Camera ====================
+        function animate3D() {
+            animationId = requestAnimationFrame(animate3D);
+            if (animating3D) {
+                gimmickMeshes.forEach(mesh => {
+                    if (mesh.userData && mesh.userData.type === 'rotating') {
+                        mesh.rotation.y += mesh.userData.speed * 0.02;
+                    }
+                    if (mesh.userData && mesh.userData.type === 'boulder') {
+                        const range = mesh.userData.zEnd - mesh.userData.zStart;
+                        mesh.position.z = mesh.userData.zStart + (Math.sin(Date.now() * 0.001) * 0.5 + 0.5) * range;
+                        mesh.rotation.x += 0.05;
+                    }
+                    if (mesh.userData && mesh.userData.type === 'electric') {
+                        mesh.material.emissiveIntensity = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
+                    }
+                });
+            }
+            animatePlayer();
+            controls3D.update();
+            renderer3D.render(scene3D, camera3D);
+        }
+
+        function set3DCamera(view) {
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 1500;
+            const trackLength = courseLength * SCALE_3D;
+            const centerZ = trackLength / 2;
+            document.querySelectorAll('.preview3d-controls button').forEach(btn => btn.classList.remove('active'));
+            switch (view) {
+                case 'quarter': camera3D.position.set(15, 12, centerZ - 10); document.getElementById('camQuarter').classList.add('active'); break;
+                case 'top': camera3D.position.set(0, 30, centerZ); document.getElementById('camTop').classList.add('active'); break;
+                case 'side': camera3D.position.set(20, 5, centerZ); document.getElementById('camSide').classList.add('active'); break;
+                case 'first': camera3D.position.set(0, 1, 2); document.getElementById('camFirst').classList.add('active'); break;
+            }
+            controls3D.target.set(0, 1, centerZ);
+            controls3D.update();
+        }
+
+        function reset3DCamera() { set3DCamera('quarter'); }
+
+        function toggle3DAnimation() {
+            animating3D = !animating3D;
+            const btn = document.getElementById('btnAnimate');
+            btn.textContent = animating3D ? '⏸️ 일시정지' : '▶️ 기믹 애니메이션';
+            if (animating3D) btn.classList.add('active'); else btn.classList.remove('active');
+        }
+
+        // ==================== Player Character ====================
+        function createPlayer() {
+            playerGroup = new THREE.Group();
+            const bodyGeometry = new THREE.BoxGeometry(0.3, 0.4, 0.15);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x3498db });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.5;
+            body.castShadow = true;
+            body.name = 'body';
+            playerGroup.add(body);
+
+            const headGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xfdbf6f });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 0.82;
+            head.name = 'head';
+            playerGroup.add(head);
+
+            const armGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+            const armMaterial = new THREE.MeshLambertMaterial({ color: 0x3498db });
+            const leftArm = new THREE.Group();
+            const leftArmMesh = new THREE.Mesh(armGeometry, armMaterial);
+            leftArmMesh.position.y = -0.15;
+            leftArm.add(leftArmMesh);
+            leftArm.position.set(-0.22, 0.6, 0);
+            leftArm.name = 'leftArm';
+            playerGroup.add(leftArm);
+
+            const rightArm = new THREE.Group();
+            const rightArmMesh = new THREE.Mesh(armGeometry, armMaterial);
+            rightArmMesh.position.y = -0.15;
+            rightArm.add(rightArmMesh);
+            rightArm.position.set(0.22, 0.6, 0);
+            rightArm.name = 'rightArm';
+            playerGroup.add(rightArm);
+
+            const legGeometry = new THREE.BoxGeometry(0.1, 0.3, 0.1);
+            const legMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+            const leftLeg = new THREE.Group();
+            const leftLegMesh = new THREE.Mesh(legGeometry, legMaterial);
+            leftLegMesh.position.y = -0.15;
+            leftLeg.add(leftLegMesh);
+            leftLeg.position.set(-0.08, 0.28, 0);
+            leftLeg.name = 'leftLeg';
+            playerGroup.add(leftLeg);
+
+            const rightLeg = new THREE.Group();
+            const rightLegMesh = new THREE.Mesh(legGeometry, legMaterial);
+            rightLegMesh.position.y = -0.15;
+            rightLeg.add(rightLegMesh);
+            rightLeg.position.set(0.08, 0.28, 0);
+            rightLeg.name = 'rightLeg';
+            playerGroup.add(rightLeg);
+
+            playerGroup.position.set(0, 0.1, 0.5);
+            playerPosition = 0.5;
+            scene3D.add(playerGroup);
+            gimmickMeshes.push(playerGroup);
+        }
+
+        function animatePlayer() {
+            if (!playerGroup) return;
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 1500;
+            const trackLength = courseLength * SCALE_3D;
+
+            if (playerStunned && Date.now() > playerStunTime) playerStunned = false;
+
+            if (playerFlashing && Date.now() > playerFlashTime) {
+                playerFlashing = false;
+                playerGroup.children.forEach(child => {
+                    if (child.material && child.name === 'body') child.material.color.setHex(0x3498db);
+                });
+            } else if (playerFlashing) {
+                const flashOn = Math.floor(Date.now() / 50) % 2 === 0;
+                playerGroup.children.forEach(child => {
+                    if (child.material && child.name === 'body') child.material.color.setHex(flashOn ? 0xff0000 : 0xffffff);
+                });
+            }
+
+            if (playerJumping) {
+                playerYPosition += playerJumpVelocity;
+                playerJumpVelocity -= 0.008;
+                if (playerYPosition <= 0.1) { playerYPosition = 0.1; playerJumping = false; playerJumpVelocity = 0; }
+            }
+
+            if (playerKnockback !== 0) {
+                playerPosition += playerKnockback;
+                playerKnockback *= 0.85;
+                if (Math.abs(playerKnockback) < 0.01) playerKnockback = 0;
+            }
+
+            if (playerRunning && !playerStunned) {
+                runAnimationTime += 0.15;
+                playerPosition += playerSpeed;
+                if (playerPosition > trackLength) { playerPosition = 0.5; playerSlowed = false; playerSpeed = playerBaseSpeed; }
+                if (playerPosition < 0) playerPosition = 0.5;
+                checkCollisions();
+            }
+
+            playerGroup.position.z = playerPosition;
+            playerGroup.position.y = playerYPosition;
+
+            if (playerRunning && !playerStunned) {
+                const runCycle = Math.sin(runAnimationTime * 2);
+                playerGroup.children.forEach(child => {
+                    if (child.name === 'leftArm') child.rotation.x = runCycle * 0.8;
+                    if (child.name === 'rightArm') child.rotation.x = -runCycle * 0.8;
+                    if (child.name === 'leftLeg') child.rotation.x = -runCycle * 0.6;
+                    if (child.name === 'rightLeg') child.rotation.x = runCycle * 0.6;
+                    if (child.name === 'body') { child.rotation.z = runCycle * 0.05; child.position.y = 0.5 + Math.abs(Math.cos(runAnimationTime * 2)) * 0.03; }
+                    if (child.name === 'head') child.position.y = 0.82 + Math.abs(Math.cos(runAnimationTime * 2)) * 0.03;
+                });
+            } else {
+                playerGroup.rotation.z = playerStunned ? Math.sin(Date.now() * 0.02) * 0.1 : 0;
+            }
+
+            if (followCamera) {
+                camera3D.position.set(playerGroup.position.x + 3, playerGroup.position.y + 2 + playerYPosition, playerGroup.position.z - 4);
+                controls3D.target.set(playerGroup.position.x, playerGroup.position.y + 0.5, playerGroup.position.z + 2);
+            }
+        }
+
+        function checkCollisions() {
+            if (!playerGroup || !playerRunning) return;
+            const playerZ = playerPosition;
+
+            courseGimmicks.forEach((gimmick, index) => {
+                const gimmickZ = (gimmick.z || gimmick.triggerZ || gimmick.zStart || 0) * SCALE_3D;
+                const gimmickLength = (gimmick.length || 30) * SCALE_3D;
+                const gimmickEndZ = gimmick.zEnd ? gimmick.zEnd * SCALE_3D : gimmickZ + gimmickLength;
+                const cooldownKey = `${gimmick.type}_${index}`;
+                if (collisionCooldown[cooldownKey] && Date.now() < collisionCooldown[cooldownKey]) return;
+
+                switch (gimmick.type) {
+                    case 'RotatingBar': {
+                        const barZ = gimmickZ;
+                        const barHeight = (gimmick.height || 3) * SCALE_3D;
+                        if (Math.abs(playerZ - barZ) < 0.3 && playerYPosition < barHeight + 0.3) {
+                            playerKnockback = -0.8; playerStunned = true; playerStunTime = Date.now() + 500;
+                            playerFlashing = true; playerFlashTime = Date.now() + 300;
+                            collisionCooldown[cooldownKey] = Date.now() + 1000;
+                        }
+                        break;
+                    }
+                    case 'JumpPad': {
+                        if (Math.abs(playerZ - gimmickZ) < 0.4 && !playerJumping) {
+                            playerJumping = true; playerJumpVelocity = 0.15;
+                            collisionCooldown[cooldownKey] = Date.now() + 500;
+                        }
+                        break;
+                    }
+                    case 'SlimeZone': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            if (!playerSlowed) { playerSlowed = true; playerSpeed = playerBaseSpeed * 0.4; }
+                        } else if (playerSlowed) {
+                            const inAnySlime = courseGimmicks.some((g) => {
+                                if (g.type !== 'SlimeZone') return false;
+                                const sz = (g.z || 0) * SCALE_3D;
+                                const sl = (g.length || 80) * SCALE_3D;
+                                return playerZ >= sz && playerZ <= sz + sl;
+                            });
+                            if (!inAnySlime) { playerSlowed = false; playerSpeed = playerBaseSpeed; }
+                        }
+                        break;
+                    }
+                    case 'ConveyorBelt': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            playerPosition += (gimmick.direction || -1) * 0.05;
+                        }
+                        break;
+                    }
+                    case 'ElectricFloor': {
+                        if (playerZ >= gimmickZ && playerZ <= gimmickZ + gimmickLength) {
+                            if (Math.sin(Date.now() * 0.005) > 0.7 && (!collisionCooldown[cooldownKey] || Date.now() > collisionCooldown[cooldownKey])) {
+                                playerStunned = true; playerStunTime = Date.now() + 300;
+                                playerFlashing = true; playerFlashTime = Date.now() + 300;
+                                collisionCooldown[cooldownKey] = Date.now() + 800;
+                            }
+                        }
+                        break;
+                    }
+                }
+            });
+        }
+
+        function togglePlayerRun() {
+            playerRunning = !playerRunning;
+            const btn = document.getElementById('btnRun');
+            btn.textContent = playerRunning ? '⏹️ 정지' : '🏃 플레이어 달리기';
+            if (playerRunning) btn.classList.add('active'); else btn.classList.remove('active');
+        }
+
+        function toggleFollowCamera() {
+            followCamera = !followCamera;
+            const btn = document.getElementById('btnFollow');
+            btn.textContent = followCamera ? '📹 추적 중' : '📹 카메라 추적';
+            if (followCamera) btn.classList.add('active'); else { btn.classList.remove('active'); set3DCamera('quarter'); }
+        }
+
+        function resetPlayer() {
+            if (playerGroup) {
+                playerPosition = 0.5; playerYPosition = 0.1;
+                playerGroup.position.z = playerPosition; playerGroup.position.y = playerYPosition;
+                playerGroup.rotation.z = 0;
+                playerRunning = false; playerSpeed = playerBaseSpeed;
+                document.getElementById('btnRun').textContent = '🏃 플레이어 달리기';
+                document.getElementById('btnRun').classList.remove('active');
+                playerKnockback = 0; playerStunned = false; playerJumping = false;
+                playerJumpVelocity = 0; playerSlowed = false; playerFlashing = false;
+                collisionCooldown = {};
+                playerGroup.children.forEach(child => {
+                    if (child.material && child.name === 'body') child.material.color.setHex(0x3498db);
+                });
+            }
         }
 
         // ==================== Initialize ====================
