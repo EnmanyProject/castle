@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Castle - Admin Panel</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #ffd700;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Tabs */
+        .tab-container {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 2px solid #4a4a8a;
+        }
+
+        .tab-btn {
+            padding: 15px 30px;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            color: #ffd700;
+            border-bottom-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Common Buttons */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-success { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f093fb, #f5576c); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #eb3349, #f45c43); color: white; }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ==================== TAB 1: Course Editor ==================== */
+        #tab-course-editor {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+        }
+
+        .palette-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-right: 2px solid #4a4a8a;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .palette-title {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .difficulty-section { margin-bottom: 20px; }
+
+        .difficulty-label {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .difficulty-label.easy { color: #38ef7d; }
+        .difficulty-label.medium { color: #feca57; }
+        .difficulty-label.hard { color: #ff6b6b; }
+
+        .gimmick-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: grab;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .gimmick-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .gimmick-icon { font-size: 1.5rem; width: 40px; text-align: center; }
+        .gimmick-info { flex: 1; }
+        .gimmick-name { font-weight: 600; font-size: 0.95rem; }
+        .gimmick-desc { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+
+        .track-panel {
+            padding: 20px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .course-meta {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .meta-field { display: flex; flex-direction: column; gap: 5px; }
+        .meta-field label { font-size: 0.8rem; color: #aaa; }
+        .meta-field input, .meta-field select, .meta-field textarea {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            padding: 8px;
+            color: white;
+        }
+
+        .view-toggle { margin-bottom: 15px; display: flex; gap: 10px; }
+
+        .track-view-2d {
+            background: linear-gradient(180deg, #2d3436 0%, #636e72 100%);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            border: 2px dashed #4a4a8a;
+            overflow-y: auto;
+        }
+
+        .track-view-3d {
+            background: #1a1a2e;
+            border-radius: 10px;
+            height: 500px;
+        }
+
+        .track-lane {
+            position: relative;
+            width: 100%;
+            min-height: 100%;
+        }
+
+        .placed-gimmick {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        .placed-gimmick:hover { background: rgba(255, 255, 255, 0.3); }
+        .placed-gimmick.selected { border: 2px solid #ffd700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+
+        .properties-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 2px solid #4a4a8a;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .properties-title {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .property-group { margin-bottom: 15px; }
+        .property-label { font-size: 0.85rem; color: #aaa; margin-bottom: 5px; }
+        .property-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            padding: 8px;
+            color: white;
+        }
+
+        .course-stats {
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .stat-label { color: #aaa; }
+        .stat-value { color: #ffd700; font-weight: 600; }
+
+        /* ==================== TAB 2: Gimmick Guide ==================== */
+        #tab-gimmick-guide {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .guide-header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #ffd700;
+        }
+
+        .guide-header h2 {
+            color: #ffd700;
+            font-size: 1.8rem;
+        }
+
+        .gimmick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .gimmick-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s;
+        }
+
+        .gimmick-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .gimmick-card-header {
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .gimmick-card-icon {
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .gimmick-card-title h3 { font-size: 1.2rem; }
+        .gimmick-card-title .difficulty { font-size: 0.8rem; color: #888; }
+
+        .gimmick-card-body { padding: 15px; }
+        .gimmick-card-desc { color: #ccc; line-height: 1.6; margin-bottom: 10px; }
+
+        .gimmick-tips {
+            background: rgba(0, 255, 100, 0.1);
+            border-left: 3px solid #00ff64;
+            padding: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .gimmick-tips h4 { color: #00ff64; margin-bottom: 5px; font-size: 0.9rem; }
+        .gimmick-tips ul { color: #aaa; padding-left: 20px; font-size: 0.85rem; }
+
+        .config-box {
+            background: rgba(100, 100, 255, 0.1);
+            border: 1px solid rgba(100, 100, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .config-box h4 { color: #8888ff; margin-bottom: 8px; font-size: 0.9rem; }
+        .config-box code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #ffcc00;
+            font-size: 0.85rem;
+        }
+
+        /* Card Colors */
+        .card-rotating { border-top: 4px solid #ff4444; }
+        .card-jump { border-top: 4px solid #44ff44; }
+        .card-slime { border-top: 4px solid #88ff88; }
+        .card-punching { border-top: 4px solid #ff6666; }
+        .card-quiz { border-top: 4px solid #aa44ff; }
+        .card-elevator { border-top: 4px solid #44ffff; }
+        .card-conveyor { border-top: 4px solid #ff8844; }
+        .card-electric { border-top: 4px solid #ffff44; }
+        .card-boulder { border-top: 4px solid #888888; }
+        .card-portal { border-top: 4px solid #ff44ff; }
+
+        /* ==================== TAB 3: Quiz Pool ==================== */
+        #tab-quiz-pool {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+        }
+
+        .quiz-list-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-right: 2px solid #4a4a8a;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .quiz-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .quiz-list-title { font-size: 1.1rem; }
+
+        .quiz-filter {
+            margin-bottom: 15px;
+        }
+
+        .quiz-filter select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            padding: 8px;
+            color: white;
+        }
+
+        .quiz-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quiz-item:hover { background: rgba(255, 255, 255, 0.2); }
+        .quiz-item.selected { border: 2px solid #ffd700; }
+
+        .quiz-item-question {
+            font-weight: 600;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .quiz-item-meta {
+            font-size: 0.8rem;
+            color: #888;
+            display: flex;
+            gap: 10px;
+        }
+
+        .quiz-editor-panel {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .quiz-editor-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .quiz-form {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a4a8a;
+            border-radius: 6px;
+            padding: 12px;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .form-group textarea { min-height: 80px; resize: vertical; }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .option-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .option-number.correct { background: #38ef7d; color: #000; }
+
+        .option-input { flex: 1; }
+
+        .option-correct-btn {
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #4a4a8a;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .option-correct-btn:hover { border-color: #38ef7d; color: #38ef7d; }
+        .option-correct-btn.active { background: #38ef7d; color: #000; border-color: #38ef7d; }
+
+        .option-delete-btn {
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: none;
+            background: rgba(255, 0, 0, 0.3);
+            color: #ff6b6b;
+            cursor: pointer;
+        }
+
+        .add-option-btn {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #4a4a8a;
+            border-radius: 6px;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+
+        .add-option-btn:hover { border-color: #ffd700; color: #ffd700; }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .quiz-export-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 10px;
+            border: 1px solid #ffd700;
+        }
+
+        .quiz-export-section h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+
+        .export-preview {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid #4a4a8a;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #4a4a8a;
+        }
+
+        .modal-title { font-size: 1.3rem; color: #ffd700; }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-close:hover { color: #fff; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>🏰 Quiz Castle - Admin Panel</h1>
+        <div class="header-buttons">
+            <button class="btn btn-success" onclick="exportAll()">📦 전체 내보내기</button>
+            <button class="btn btn-primary" onclick="loadFromFile()">📂 불러오기</button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="switchTab('course-editor')">📝 코스 에디터</button>
+        <button class="tab-btn" onclick="switchTab('gimmick-guide')">📖 기믹 가이드</button>
+        <button class="tab-btn" onclick="switchTab('quiz-pool')">❓ 퀴즈 풀</button>
+    </div>
+
+    <!-- Tab 1: Course Editor -->
+    <div id="tab-course-editor" class="tab-content active">
+        <!-- Left: Gimmick Palette -->
+        <div class="palette-panel">
+            <div class="palette-title">🎨 기믹 팔레트</div>
+
+            <div class="difficulty-section">
+                <div class="difficulty-label easy">쉬움</div>
+                <div class="gimmick-item" draggable="true" data-type="RotatingBar">
+                    <div class="gimmick-icon">🔄</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">회전 막대</div>
+                        <div class="gimmick-desc">회전하는 장애물</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="JumpPad">
+                    <div class="gimmick-icon">🔺</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">점프 패드</div>
+                        <div class="gimmick-desc">밟으면 점프</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="SlimeZone">
+                    <div class="gimmick-icon">👻</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">슬라임 구역</div>
+                        <div class="gimmick-desc">속도 감소</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-section">
+                <div class="difficulty-label medium">보통</div>
+                <div class="gimmick-item" draggable="true" data-type="QuizGate">
+                    <div class="gimmick-icon">🚪</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">퀴즈 게이트</div>
+                        <div class="gimmick-desc">정답 문 통과</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="Elevator">
+                    <div class="gimmick-icon">🛗</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">엘리베이터</div>
+                        <div class="gimmick-desc">퀴즈 플랫폼</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="ConveyorBelt">
+                    <div class="gimmick-icon">➡️</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">컨베이어</div>
+                        <div class="gimmick-desc">뒤로 밀림</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="PortalMaze">
+                    <div class="gimmick-icon">🌀</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">포탈 미로</div>
+                        <div class="gimmick-desc">퀴즈 텔레포트</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-section">
+                <div class="difficulty-label hard">어려움</div>
+                <div class="gimmick-item" draggable="true" data-type="PunchingCorridor">
+                    <div class="gimmick-icon">🥊</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">펀칭 복도</div>
+                        <div class="gimmick-desc">패턴 회피</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="ElectricFloor">
+                    <div class="gimmick-icon">⚡</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">전기 바닥</div>
+                        <div class="gimmick-desc">레인 이동</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="RollingBoulder">
+                    <div class="gimmick-icon">🪨</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">굴러오는 바위</div>
+                        <div class="gimmick-desc">홈으로 회피</div>
+                    </div>
+                </div>
+                <div class="gimmick-item" draggable="true" data-type="DisappearingBridge">
+                    <div class="gimmick-icon">🌉</div>
+                    <div class="gimmick-info">
+                        <div class="gimmick-name">사라지는 다리</div>
+                        <div class="gimmick-desc">타이밍 점프</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Track View -->
+        <div class="track-panel">
+            <div class="course-meta">
+                <div class="meta-field">
+                    <label>코스 ID</label>
+                    <input type="text" id="courseId" value="my-course" placeholder="영문, 숫자, 하이픈">
+                </div>
+                <div class="meta-field">
+                    <label>코스 이름</label>
+                    <input type="text" id="courseName" value="My Custom Course" placeholder="코스 이름">
+                </div>
+                <div class="meta-field">
+                    <label>제작자</label>
+                    <input type="text" id="courseAuthor" value="Creator" placeholder="제작자 이름">
+                </div>
+                <div class="meta-field">
+                    <label>난이도</label>
+                    <select id="courseDifficulty">
+                        <option value="easy">쉬움</option>
+                        <option value="medium" selected>보통</option>
+                        <option value="hard">어려움</option>
+                    </select>
+                </div>
+                <div class="meta-field" style="grid-column: span 2;">
+                    <label>설명</label>
+                    <input type="text" id="courseDescription" value="" placeholder="코스 설명">
+                </div>
+                <div class="meta-field">
+                    <label>트랙 길이</label>
+                    <input type="number" id="courseLength" value="1500" min="500" max="5000" step="100">
+                </div>
+                <div class="meta-field">
+                    <label>퀴즈 풀</label>
+                    <select id="courseQuizPool">
+                        <option value="">기본 (서버)</option>
+                        <option value="custom">커스텀 퀴즈 사용</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="view-toggle">
+                <button class="btn btn-primary" onclick="setView('2d')">2D 뷰</button>
+                <button class="btn btn-primary" onclick="setView('3d')">3D 뷰</button>
+                <button class="btn btn-warning" onclick="clearCourse()">🗑️ 초기화</button>
+            </div>
+
+            <div id="track-view-2d" class="track-view-2d">
+                <div class="track-lane" id="track-lane"></div>
+            </div>
+            <div id="track-view-3d" class="track-view-3d" style="display: none;"></div>
+        </div>
+
+        <!-- Right: Properties Panel -->
+        <div class="properties-panel">
+            <div class="properties-title">⚙️ 속성</div>
+            <div id="properties-content">
+                <p style="color: #888;">기믹을 선택하면 속성을 편집할 수 있습니다.</p>
+            </div>
+
+            <div class="course-stats">
+                <h3 style="margin-bottom: 10px;">📊 코스 통계</h3>
+                <div class="stat-row">
+                    <span class="stat-label">총 기믹:</span>
+                    <span class="stat-value" id="totalGimmicks">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">퀴즈:</span>
+                    <span class="stat-value" id="quizCount">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">예상 시간:</span>
+                    <span class="stat-value" id="estTime">~0초</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-success" style="width: 100%; margin-bottom: 10px;" onclick="exportCourseJSON()">📄 JSON 내보내기</button>
+                <button class="btn btn-primary" style="width: 100%;" onclick="exportCourseLua()">📜 Lua 내보내기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: Gimmick Guide -->
+    <div id="tab-gimmick-guide" class="tab-content">
+        <div class="guide-header">
+            <h2>📖 기믹 가이드</h2>
+            <p>각 기믹의 동작 방식과 공략법</p>
+        </div>
+
+        <div class="gimmick-grid" id="gimmick-guide-grid">
+            <!-- Gimmick cards will be generated by JS -->
+        </div>
+    </div>
+
+    <!-- Tab 3: Quiz Pool -->
+    <div id="tab-quiz-pool" class="tab-content">
+        <!-- Left: Quiz List -->
+        <div class="quiz-list-panel">
+            <div class="quiz-list-header">
+                <span class="quiz-list-title">📋 퀴즈 목록</span>
+                <button class="btn btn-success" onclick="addNewQuiz()">+ 추가</button>
+            </div>
+
+            <div class="quiz-filter">
+                <select id="quizFilter" onchange="filterQuizzes()">
+                    <option value="all">전체</option>
+                    <option value="2">2지선다</option>
+                    <option value="3">3지선다</option>
+                    <option value="4">4지선다</option>
+                </select>
+            </div>
+
+            <div id="quiz-list">
+                <!-- Quiz items will be generated by JS -->
+            </div>
+        </div>
+
+        <!-- Right: Quiz Editor -->
+        <div class="quiz-editor-panel">
+            <div class="quiz-editor-title">✏️ 퀴즈 편집기</div>
+
+            <div class="quiz-form">
+                <div class="form-group">
+                    <label>질문</label>
+                    <textarea id="quizQuestion" placeholder="퀴즈 질문을 입력하세요"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>선택지 (정답 클릭)</label>
+                    <div class="options-container" id="options-container">
+                        <!-- Options will be generated by JS -->
+                    </div>
+                    <button class="add-option-btn" onclick="addOption()">+ 선택지 추가</button>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-success" onclick="saveQuiz()">💾 저장</button>
+                    <button class="btn btn-danger" onclick="deleteQuiz()">🗑️ 삭제</button>
+                    <button class="btn btn-primary" onclick="clearQuizForm()">📝 새로 만들기</button>
+                </div>
+            </div>
+
+            <div class="quiz-export-section">
+                <h3>📦 퀴즈 풀 내보내기</h3>
+                <div style="margin-bottom: 10px;">
+                    <button class="btn btn-success" onclick="copyQuizPool()">📋 JSON 복사</button>
+                    <button class="btn btn-primary" onclick="downloadQuizPool()">💾 다운로드</button>
+                </div>
+                <div class="export-preview" id="quiz-export-preview">
+// 퀴즈를 추가하면 여기에 미리보기가 표시됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal-overlay" id="export-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">📦 내보내기</span>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>내보내기 형식</label>
+                    <select id="exportFormat">
+                        <option value="json">JSON (웹 코스)</option>
+                        <option value="lua">Lua (ModuleScript)</option>
+                    </select>
+                </div>
+                <div class="export-preview" id="export-preview"></div>
+                <div class="form-actions">
+                    <button class="btn btn-success" onclick="copyExport()">📋 복사</button>
+                    <button class="btn btn-primary" onclick="downloadExport()">💾 다운로드</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Global State ====================
+        let courseGimmicks = [];
+        let selectedGimmick = null;
+        let quizPool = [];
+        let selectedQuizIndex = -1;
+        let currentView = '2d';
+        let gimmickIdCounter = { QuizGate: 0, Elevator: 0, PortalMaze: 0 };
+
+        // ==================== Gimmick Definitions ====================
+        const GIMMICK_DEFS = {
+            RotatingBar: {
+                displayName: "회전 막대",
+                icon: "🔄",
+                difficulty: "easy",
+                description: "회전하는 막대 장애물. 틈새로 통과하거나 점프/숙여서 피하기",
+                tips: ["중앙 틈새(초록)로 통과", "low 타입은 점프", "high 타입은 숙이기"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    width: { type: "number", default: 28, label: "너비" },
+                    height: { type: "number", default: 3, label: "높이" },
+                    speed: { type: "number", default: 1.5, label: "회전 속도" },
+                    gapSize: { type: "number", default: 6, label: "틈새 크기" },
+                    barType: { type: "select", default: "normal", label: "타입", options: ["normal", "low", "high"] }
+                }
+            },
+            JumpPad: {
+                displayName: "점프 패드",
+                icon: "🔺",
+                difficulty: "easy",
+                description: "밟으면 점프. Booster 상태에서 하이점프 + 보상",
+                tips: ["Booster 아이템으로 하이점프", "높은 보상 박스 획득 가능"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    x: { type: "number", default: 0, label: "X 위치" },
+                    moveRange: { type: "number", default: 10, label: "이동 범위" },
+                    moveSpeed: { type: "number", default: 1.5, label: "이동 속도" }
+                }
+            },
+            SlimeZone: {
+                displayName: "슬라임 구역",
+                icon: "👻",
+                difficulty: "easy",
+                description: "밟으면 속도가 느려지는 구역",
+                tips: ["가장자리 안전 레인 이용", "가운데는 피하기"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    length: { type: "number", default: 60, label: "길이" }
+                }
+            },
+            QuizGate: {
+                displayName: "퀴즈 게이트",
+                icon: "🚪",
+                difficulty: "medium",
+                description: "퀴즈 정답 문으로 통과. 오답 시 밀려남",
+                tips: ["트리거 밟으면 퀴즈 표시", "정답: +10% 속도", "오답: 밀려남 + 스턴"],
+                schema: {
+                    id: { type: "number", default: 1, label: "게이트 ID" },
+                    triggerZ: { type: "number", default: 100, label: "트리거 위치" },
+                    gateZ: { type: "number", default: 130, label: "게이트 위치" },
+                    options: { type: "number", default: 2, label: "선택지 수 (2-4)" }
+                }
+            },
+            Elevator: {
+                displayName: "엘리베이터",
+                icon: "🛗",
+                difficulty: "medium",
+                description: "정답 플랫폼이 빨리 올라감",
+                tips: ["정답 플랫폼 먼저 상승", "오답 플랫폼은 느리게"],
+                schema: {
+                    id: { type: "number", default: 1, label: "엘리베이터 ID" },
+                    triggerZ: { type: "number", default: 100, label: "트리거 위치" },
+                    elevZ: { type: "number", default: 130, label: "엘리베이터 위치" },
+                    options: { type: "number", default: 3, label: "선택지 수 (2-4)" }
+                }
+            },
+            ConveyorBelt: {
+                displayName: "컨베이어 벨트",
+                icon: "➡️",
+                difficulty: "medium",
+                description: "뒤로 밀리는 벨트. 양쪽 안전 레인 있음",
+                tips: ["가장자리 초록 레인 이용", "중앙은 뒤로 밀림"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    length: { type: "number", default: 60, label: "길이" },
+                    direction: { type: "number", default: -1, label: "방향 (-1=뒤)" },
+                    safeLaneWidth: { type: "number", default: 4, label: "안전 레인 너비" }
+                }
+            },
+            PortalMaze: {
+                displayName: "포탈 미로",
+                icon: "🌀",
+                difficulty: "medium",
+                description: "퀴즈 정답 포탈로 들어가면 앞으로 텔레포트",
+                tips: ["정답 포탈: 앞으로 + 속도 증가", "오답 포탈: 시작점으로"],
+                schema: {
+                    id: { type: "number", default: 1, label: "포탈 ID" },
+                    triggerZ: { type: "number", default: 100, label: "트리거 위치" },
+                    portalZ: { type: "number", default: 130, label: "포탈 위치" },
+                    exitZ: { type: "number", default: 180, label: "출구 위치" },
+                    options: { type: "number", default: 3, label: "포탈 수 (2-4)" }
+                }
+            },
+            PunchingCorridor: {
+                displayName: "펀칭 복도",
+                icon: "🥊",
+                difficulty: "hard",
+                description: "3레인 패턴 기반 펀칭 글러브",
+                tips: ["노란색 경고 확인", "안전 레인으로 이동"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    length: { type: "number", default: 100, label: "길이" },
+                    laneCount: { type: "number", default: 3, label: "레인 수" }
+                }
+            },
+            ElectricFloor: {
+                displayName: "전기 바닥",
+                icon: "⚡",
+                difficulty: "hard",
+                description: "3레인 순차적 전기 충격",
+                tips: ["노란색 경고 레인 피하기", "순서대로 레인 이동"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    length: { type: "number", default: 60, label: "길이" },
+                    laneCount: { type: "number", default: 3, label: "레인 수" }
+                }
+            },
+            RollingBoulder: {
+                displayName: "굴러오는 바위",
+                icon: "🪨",
+                difficulty: "hard",
+                description: "양쪽 홈(alcove)으로 회피",
+                tips: ["노란색 경고 시 홈으로 이동", "양쪽에 안전 구역 있음"],
+                schema: {
+                    zStart: { type: "number", default: 100, label: "시작 위치" },
+                    zEnd: { type: "number", default: 200, label: "끝 위치" },
+                    alcoveCount: { type: "number", default: 4, label: "홈 개수" }
+                }
+            },
+            DisappearingBridge: {
+                displayName: "사라지는 다리",
+                icon: "🌉",
+                difficulty: "hard",
+                description: "순서대로 사라지는 플랫폼",
+                tips: ["빠르게 통과", "타이밍 맞춰 점프"],
+                schema: {
+                    z: { type: "number", default: 100, label: "위치 (Z)" },
+                    platformCount: { type: "number", default: 6, label: "플랫폼 수" }
+                }
+            }
+        };
+
+        // ==================== Tab Switching ====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            if (tabName === 'gimmick-guide') {
+                renderGimmickGuide();
+            } else if (tabName === 'quiz-pool') {
+                renderQuizList();
+                updateQuizPreview();
+            }
+        }
+
+        // ==================== Course Editor ====================
+        function setView(view) {
+            currentView = view;
+            document.getElementById('track-view-2d').style.display = view === '2d' ? 'block' : 'none';
+            document.getElementById('track-view-3d').style.display = view === '3d' ? 'block' : 'none';
+            if (view === '3d') init3DView();
+        }
+
+        function init3DView() {
+            // Simplified 3D view
+            const container = document.getElementById('track-view-3d');
+            container.innerHTML = '<p style="padding: 20px; color: #888;">3D 뷰는 준비 중입니다.</p>';
+        }
+
+        function renderTrack() {
+            const lane = document.getElementById('track-lane');
+            const length = parseInt(document.getElementById('courseLength').value) || 1500;
+            lane.style.height = `${length / 2}px`;
+            lane.innerHTML = '';
+
+            courseGimmicks.sort((a, b) => {
+                const zA = a.z || a.triggerZ || a.zStart || 0;
+                const zB = b.z || b.triggerZ || b.zStart || 0;
+                return zA - zB;
+            });
+
+            courseGimmicks.forEach((gimmick, index) => {
+                const z = gimmick.z || gimmick.triggerZ || gimmick.zStart || 0;
+                const def = GIMMICK_DEFS[gimmick.type];
+                if (!def) return;
+
+                const el = document.createElement('div');
+                el.className = 'placed-gimmick' + (selectedGimmick === index ? ' selected' : '');
+                el.style.top = `${z / 2}px`;
+                el.innerHTML = `${def.icon} ${def.displayName} (z=${z})`;
+                el.onclick = () => selectGimmick(index);
+                lane.appendChild(el);
+            });
+
+            updateStats();
+        }
+
+        function selectGimmick(index) {
+            selectedGimmick = index;
+            renderTrack();
+            renderProperties();
+        }
+
+        function renderProperties() {
+            const container = document.getElementById('properties-content');
+            if (selectedGimmick === null || !courseGimmicks[selectedGimmick]) {
+                container.innerHTML = '<p style="color: #888;">기믹을 선택하면 속성을 편집할 수 있습니다.</p>';
+                return;
+            }
+
+            const gimmick = courseGimmicks[selectedGimmick];
+            const def = GIMMICK_DEFS[gimmick.type];
+            if (!def) return;
+
+            let html = `<h4 style="margin-bottom: 15px;">${def.icon} ${def.displayName}</h4>`;
+
+            for (const [key, config] of Object.entries(def.schema)) {
+                const value = gimmick[key] !== undefined ? gimmick[key] : config.default;
+                html += `<div class="property-group">
+                    <div class="property-label">${config.label}</div>`;
+
+                if (config.type === 'select') {
+                    html += `<select class="property-input" onchange="updateGimmickProperty('${key}', this.value)">`;
+                    config.options.forEach(opt => {
+                        html += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+                    });
+                    html += '</select>';
+                } else {
+                    html += `<input type="${config.type}" class="property-input" value="${value}"
+                        onchange="updateGimmickProperty('${key}', this.value)">`;
+                }
+                html += '</div>';
+            }
+
+            html += `<button class="btn btn-danger" style="width: 100%; margin-top: 20px;" onclick="deleteGimmick()">🗑️ 삭제</button>`;
+            container.innerHTML = html;
+        }
+
+        function updateGimmickProperty(key, value) {
+            if (selectedGimmick === null) return;
+            const gimmick = courseGimmicks[selectedGimmick];
+            const def = GIMMICK_DEFS[gimmick.type];
+            const schema = def.schema[key];
+
+            if (schema.type === 'number') {
+                gimmick[key] = parseFloat(value);
+            } else {
+                gimmick[key] = value;
+            }
+            renderTrack();
+        }
+
+        function deleteGimmick() {
+            if (selectedGimmick === null) return;
+            courseGimmicks.splice(selectedGimmick, 1);
+            selectedGimmick = null;
+            renderTrack();
+            renderProperties();
+        }
+
+        function clearCourse() {
+            if (confirm('코스를 초기화하시겠습니까?')) {
+                courseGimmicks = [];
+                selectedGimmick = null;
+                gimmickIdCounter = { QuizGate: 0, Elevator: 0, PortalMaze: 0 };
+                renderTrack();
+                renderProperties();
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalGimmicks').textContent = courseGimmicks.length;
+            document.getElementById('quizCount').textContent = courseGimmicks.filter(g =>
+                ['QuizGate', 'Elevator', 'PortalMaze'].includes(g.type)).length;
+            const length = parseInt(document.getElementById('courseLength').value) || 1500;
+            document.getElementById('estTime').textContent = `~${Math.round(length / 16)}초`;
+        }
+
+        // Drag and Drop
+        document.querySelectorAll('.gimmick-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('gimmickType', item.dataset.type);
+            });
+        });
+
+        document.getElementById('track-lane').addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.getElementById('track-lane').addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('gimmickType');
+            if (!type || !GIMMICK_DEFS[type]) return;
+
+            const rect = e.currentTarget.getBoundingClientRect();
+            const z = Math.round((e.clientY - rect.top) * 2 / 10) * 10;
+
+            const def = GIMMICK_DEFS[type];
+            const gimmick = { type };
+
+            for (const [key, config] of Object.entries(def.schema)) {
+                if (key === 'z' || key === 'triggerZ' || key === 'zStart') {
+                    gimmick[key] = z;
+                } else if (key === 'gateZ' || key === 'elevZ' || key === 'portalZ') {
+                    gimmick[key] = z + 30;
+                } else if (key === 'zEnd') {
+                    gimmick[key] = z + 100;
+                } else if (key === 'exitZ') {
+                    gimmick[key] = z + 80;
+                } else if (key === 'id') {
+                    gimmickIdCounter[type] = (gimmickIdCounter[type] || 0) + 1;
+                    gimmick[key] = gimmickIdCounter[type];
+                } else {
+                    gimmick[key] = config.default;
+                }
+            }
+
+            courseGimmicks.push(gimmick);
+            renderTrack();
+        });
+
+        // ==================== Gimmick Guide ====================
+        function renderGimmickGuide() {
+            const grid = document.getElementById('gimmick-guide-grid');
+            grid.innerHTML = '';
+
+            const cardColors = {
+                RotatingBar: 'card-rotating',
+                JumpPad: 'card-jump',
+                SlimeZone: 'card-slime',
+                PunchingCorridor: 'card-punching',
+                QuizGate: 'card-quiz',
+                Elevator: 'card-elevator',
+                ConveyorBelt: 'card-conveyor',
+                ElectricFloor: 'card-electric',
+                RollingBoulder: 'card-boulder',
+                PortalMaze: 'card-portal',
+                DisappearingBridge: 'card-conveyor'
+            };
+
+            for (const [type, def] of Object.entries(GIMMICK_DEFS)) {
+                const card = document.createElement('div');
+                card.className = `gimmick-card ${cardColors[type] || ''}`;
+
+                let schemaHtml = '';
+                for (const [key, config] of Object.entries(def.schema)) {
+                    schemaHtml += `<code>${key}</code> `;
+                }
+
+                card.innerHTML = `
+                    <div class="gimmick-card-header">
+                        <div class="gimmick-card-icon">${def.icon}</div>
+                        <div class="gimmick-card-title">
+                            <h3>${def.displayName}</h3>
+                            <span class="difficulty">${def.difficulty}</span>
+                        </div>
+                    </div>
+                    <div class="gimmick-card-body">
+                        <p class="gimmick-card-desc">${def.description}</p>
+                        <div class="gimmick-tips">
+                            <h4>💡 공략</h4>
+                            <ul>
+                                ${def.tips.map(tip => `<li>${tip}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="config-box">
+                            <h4>⚙️ 설정</h4>
+                            <p>${schemaHtml}</p>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        // ==================== Quiz Pool ====================
+        function renderQuizList() {
+            const container = document.getElementById('quiz-list');
+            const filter = document.getElementById('quizFilter').value;
+
+            container.innerHTML = '';
+
+            quizPool.forEach((quiz, index) => {
+                if (filter !== 'all' && quiz.o.length !== parseInt(filter)) return;
+
+                const item = document.createElement('div');
+                item.className = 'quiz-item' + (selectedQuizIndex === index ? ' selected' : '');
+                item.onclick = () => selectQuiz(index);
+                item.innerHTML = `
+                    <div class="quiz-item-question">${quiz.q}</div>
+                    <div class="quiz-item-meta">
+                        <span>${quiz.o.length}지선다</span>
+                        <span>정답: ${quiz.a}번</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+
+            if (quizPool.length === 0) {
+                container.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">퀴즈를 추가해주세요.</p>';
+            }
+        }
+
+        function filterQuizzes() {
+            renderQuizList();
+        }
+
+        function selectQuiz(index) {
+            selectedQuizIndex = index;
+            renderQuizList();
+            loadQuizToForm(quizPool[index]);
+        }
+
+        function loadQuizToForm(quiz) {
+            document.getElementById('quizQuestion').value = quiz.q;
+            renderOptions(quiz.o, quiz.a);
+        }
+
+        function renderOptions(options = ['', ''], answer = 1) {
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            options.forEach((opt, index) => {
+                const row = document.createElement('div');
+                row.className = 'option-row';
+                row.innerHTML = `
+                    <div class="option-number ${answer === index + 1 ? 'correct' : ''}">${index + 1}</div>
+                    <input type="text" class="option-input property-input" value="${opt}" placeholder="선택지 ${index + 1}">
+                    <button class="option-correct-btn ${answer === index + 1 ? 'active' : ''}" onclick="setCorrectAnswer(${index + 1})">정답</button>
+                    ${options.length > 2 ? `<button class="option-delete-btn" onclick="removeOption(${index})">✕</button>` : ''}
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function addOption() {
+            const container = document.getElementById('options-container');
+            const currentOptions = container.querySelectorAll('.option-input');
+            if (currentOptions.length >= 4) {
+                alert('최대 4개까지 가능합니다.');
+                return;
+            }
+            const options = Array.from(currentOptions).map(input => input.value);
+            options.push('');
+            renderOptions(options, getCorrectAnswer());
+        }
+
+        function removeOption(index) {
+            const container = document.getElementById('options-container');
+            const currentOptions = container.querySelectorAll('.option-input');
+            const options = Array.from(currentOptions).map(input => input.value);
+            let answer = getCorrectAnswer();
+
+            options.splice(index, 1);
+            if (answer > options.length) answer = options.length;
+            if (answer === index + 1) answer = 1;
+
+            renderOptions(options, answer);
+        }
+
+        function setCorrectAnswer(num) {
+            const container = document.getElementById('options-container');
+            const options = Array.from(container.querySelectorAll('.option-input')).map(input => input.value);
+            renderOptions(options, num);
+        }
+
+        function getCorrectAnswer() {
+            const btns = document.querySelectorAll('.option-correct-btn');
+            for (let i = 0; i < btns.length; i++) {
+                if (btns[i].classList.contains('active')) return i + 1;
+            }
+            return 1;
+        }
+
+        function addNewQuiz() {
+            selectedQuizIndex = -1;
+            clearQuizForm();
+            renderQuizList();
+        }
+
+        function clearQuizForm() {
+            document.getElementById('quizQuestion').value = '';
+            renderOptions(['', ''], 1);
+            selectedQuizIndex = -1;
+            renderQuizList();
+        }
+
+        function saveQuiz() {
+            const question = document.getElementById('quizQuestion').value.trim();
+            const options = Array.from(document.querySelectorAll('.option-input')).map(input => input.value.trim());
+            const answer = getCorrectAnswer();
+
+            if (!question) {
+                alert('질문을 입력해주세요.');
+                return;
+            }
+            if (options.some(opt => !opt)) {
+                alert('모든 선택지를 입력해주세요.');
+                return;
+            }
+
+            const quiz = { q: question, o: options, a: answer };
+
+            if (selectedQuizIndex >= 0) {
+                quizPool[selectedQuizIndex] = quiz;
+            } else {
+                quizPool.push(quiz);
+                selectedQuizIndex = quizPool.length - 1;
+            }
+
+            renderQuizList();
+            updateQuizPreview();
+            alert('저장되었습니다.');
+        }
+
+        function deleteQuiz() {
+            if (selectedQuizIndex < 0) {
+                alert('삭제할 퀴즈를 선택해주세요.');
+                return;
+            }
+            if (confirm('이 퀴즈를 삭제하시겠습니까?')) {
+                quizPool.splice(selectedQuizIndex, 1);
+                selectedQuizIndex = -1;
+                clearQuizForm();
+                renderQuizList();
+                updateQuizPreview();
+            }
+        }
+
+        function updateQuizPreview() {
+            const preview = document.getElementById('quiz-export-preview');
+            if (quizPool.length === 0) {
+                preview.textContent = '// 퀴즈를 추가하면 여기에 미리보기가 표시됩니다.';
+                return;
+            }
+            preview.textContent = JSON.stringify(quizPool, null, 2);
+        }
+
+        function copyQuizPool() {
+            navigator.clipboard.writeText(JSON.stringify(quizPool, null, 2));
+            alert('클립보드에 복사되었습니다.');
+        }
+
+        function downloadQuizPool() {
+            const blob = new Blob([JSON.stringify(quizPool, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'quizPool.json';
+            a.click();
+        }
+
+        // ==================== Export ====================
+        function exportCourseJSON() {
+            const course = buildCourseData();
+            course.quizPool = quizPool.length > 0 ? quizPool : undefined;
+
+            const json = JSON.stringify(course, null, 2);
+            document.getElementById('export-preview').textContent = json;
+            document.getElementById('exportFormat').value = 'json';
+            document.getElementById('export-modal').classList.add('active');
+        }
+
+        function exportCourseLua() {
+            const course = buildCourseData();
+            const lua = convertToLua(course);
+
+            document.getElementById('export-preview').textContent = lua;
+            document.getElementById('exportFormat').value = 'lua';
+            document.getElementById('export-modal').classList.add('active');
+        }
+
+        function buildCourseData() {
+            return {
+                metadata: {
+                    id: document.getElementById('courseId').value,
+                    name: document.getElementById('courseName').value,
+                    author: document.getElementById('courseAuthor').value,
+                    version: "1.0",
+                    length: parseInt(document.getElementById('courseLength').value),
+                    difficulty: document.getElementById('courseDifficulty').value,
+                    description: document.getElementById('courseDescription').value
+                },
+                gimmicks: courseGimmicks,
+                quizPool: quizPool.length > 0 ? quizPool : undefined
+            };
+        }
+
+        function convertToLua(course) {
+            let lua = `--[[\n  Quiz Castle Course: ${course.metadata.name}\n  Generated by Admin Panel\n]]\n\nreturn {\n`;
+            lua += `    metadata = {\n`;
+            lua += `        id = "${course.metadata.id}",\n`;
+            lua += `        name = "${course.metadata.name}",\n`;
+            lua += `        author = "${course.metadata.author}",\n`;
+            lua += `        version = "${course.metadata.version}",\n`;
+            lua += `        length = ${course.metadata.length},\n`;
+            lua += `        difficulty = "${course.metadata.difficulty}",\n`;
+            lua += `        description = "${course.metadata.description}"\n`;
+            lua += `    },\n\n`;
+
+            if (course.quizPool && course.quizPool.length > 0) {
+                lua += `    quizPool = {\n`;
+                course.quizPool.forEach(q => {
+                    const opts = q.o.map(o => `"${o}"`).join(', ');
+                    lua += `        {q = "${q.q}", o = {${opts}}, a = ${q.a}},\n`;
+                });
+                lua += `    },\n\n`;
+            }
+
+            lua += `    gimmicks = {\n`;
+            course.gimmicks.forEach(g => {
+                const props = Object.entries(g).map(([k, v]) => {
+                    if (typeof v === 'string') return `${k} = "${v}"`;
+                    return `${k} = ${v}`;
+                }).join(', ');
+                lua += `        {${props}},\n`;
+            });
+            lua += `    }\n}\n`;
+
+            return lua;
+        }
+
+        function copyExport() {
+            const text = document.getElementById('export-preview').textContent;
+            navigator.clipboard.writeText(text);
+            alert('클립보드에 복사되었습니다.');
+        }
+
+        function downloadExport() {
+            const text = document.getElementById('export-preview').textContent;
+            const format = document.getElementById('exportFormat').value;
+            const ext = format === 'json' ? 'json' : 'lua';
+            const filename = document.getElementById('courseId').value + '.' + ext;
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+        }
+
+        function closeModal() {
+            document.getElementById('export-modal').classList.remove('active');
+        }
+
+        function exportAll() {
+            exportCourseJSON();
+        }
+
+        function loadFromFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (data.metadata) {
+                            document.getElementById('courseId').value = data.metadata.id || '';
+                            document.getElementById('courseName').value = data.metadata.name || '';
+                            document.getElementById('courseAuthor').value = data.metadata.author || '';
+                            document.getElementById('courseDifficulty').value = data.metadata.difficulty || 'medium';
+                            document.getElementById('courseDescription').value = data.metadata.description || '';
+                            document.getElementById('courseLength').value = data.metadata.length || 1500;
+                        }
+                        if (data.gimmicks) {
+                            courseGimmicks = data.gimmicks;
+                        }
+                        if (data.quizPool) {
+                            quizPool = data.quizPool;
+                        }
+                        renderTrack();
+                        alert('불러오기 완료!');
+                    } catch (err) {
+                        alert('파일 형식이 올바르지 않습니다.');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // ==================== Initialize ====================
+        renderTrack();
+        renderOptions(['', ''], 1);
+    </script>
+</body>
+</html>
