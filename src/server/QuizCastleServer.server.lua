@@ -863,8 +863,11 @@ GimmickRegistry:Register({
 
             -- 회전 (두 바를 함께 회전시키는 피벗)
             local pivotRotation = math.random(0, 360)
+            local leftOffset = -(sideWidth/2 + gapSize/2)
+            local rightOffset = sideWidth/2 + gapSize/2
             table.insert(RotatingObjects, {
                 parts = bars,
+                offsets = {leftOffset, rightOffset},  -- 초기 오프셋 저장
                 pivotZ = data.z,
                 pivotY = barHeight,
                 speed = actualSpeed,
@@ -3804,7 +3807,29 @@ RunService.Heartbeat:Connect(function(dt)
     -- 회전 오브젝트 업데이트 (회전바 등)
     for i = #RotatingObjects, 1, -1 do
         local obj = RotatingObjects[i]
-        if obj.part and obj.part.Parent then
+
+        if obj.rotationType == "pivot" and obj.parts then
+            -- 피벗 회전 (틈새 있는 회전바)
+            local valid = true
+            for _, p in ipairs(obj.parts) do
+                if not p or not p.Parent then
+                    valid = false
+                    break
+                end
+            end
+
+            if valid then
+                obj.rotation = obj.rotation + obj.speed
+                local pivotCFrame = CFrame.new(0, obj.pivotY, obj.pivotZ)
+                for idx, bar in ipairs(obj.parts) do
+                    local offsetX = obj.offsets[idx]  -- 저장된 초기 오프셋 사용
+                    local localOffset = CFrame.new(offsetX, 0, 0)
+                    bar.CFrame = pivotCFrame * CFrame.Angles(0, math.rad(obj.rotation), 0) * localOffset
+                end
+            else
+                table.remove(RotatingObjects, i)
+            end
+        elseif obj.part and obj.part.Parent then
             obj.rotation = obj.rotation + obj.speed
             if obj.rotationType == "Y" then
                 obj.part.CFrame = CFrame.new(obj.part.Position) * CFrame.Angles(0, math.rad(obj.rotation), 0)
