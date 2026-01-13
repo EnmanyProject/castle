@@ -1,0 +1,44 @@
+{
+    "metadata": {
+        "id": "skill-test",
+        "name": "Skill Gimmick Test Course",
+        "author": "Dev Team",
+        "version": "1.0",
+        "length": 1200,
+        "difficulty": "medium",
+        "description": "스킬 기반 기믹 테스트 코스 - 각 기믹의 안전 루트 연습"
+    },
+    "gimmicks": [
+        {"type": "RotatingBar", "z": 50, "width": 28, "height": 3, "speed": 1.2, "gapSize": 6, "barType": "normal"},
+        {"type": "RotatingBar", "z": 100, "width": 30, "height": 1.5, "speed": 1.5, "gapSize": 0, "barType": "low"},
+        {"type": "RotatingBar", "z": 150, "width": 30, "height": 5, "speed": 1.5, "gapSize": 0, "barType": "high"},
+
+        {"type": "ConveyorBelt", "z": 220, "length": 60, "direction": -1, "safeLaneWidth": 4},
+
+        {"type": "QuizGate", "id": 1, "triggerZ": 320, "gateZ": 350, "options": 2},
+
+        {"type": "ElectricFloor", "z": 400, "length": 80, "laneCount": 3},
+
+        {"type": "QuizGate", "id": 2, "triggerZ": 520, "gateZ": 550, "options": 3},
+
+        {"type": "PunchingCorridor", "z": 600, "length": 120, "laneCount": 3},
+
+        {"type": "ConveyorBelt", "z": 760, "length": 50, "direction": -1, "safeLaneWidth": 5},
+
+        {"type": "QuizGate", "id": 3, "triggerZ": 850, "gateZ": 880, "options": 2},
+
+        {"type": "RollingBoulder", "zStart": 920, "zEnd": 1100, "alcoveCount": 4},
+
+        {"type": "RotatingBar", "z": 1150, "width": 32, "height": 3, "speed": 2, "gapSize": 7, "barType": "normal"}
+    ],
+    "quizPool": [
+        {"q": "초록색 레인은?", "o": ["위험", "안전"], "a": 2},
+        {"q": "노란색은 무슨 의미?", "o": ["안전", "경고"], "a": 2},
+        {"q": "바위가 오면?", "o": ["그냥 달리기", "홈으로 회피", "점프"], "a": 2},
+        {"q": "컨베이어 안전 루트?", "o": ["중앙", "가장자리"], "a": 2},
+        {"q": "전기 바닥 통과법?", "o": ["빠르게 달리기", "안전 레인 이동"], "a": 2},
+        {"q": "펀칭 복도에서?", "o": ["직진", "패턴 보고 회피"], "a": 2},
+        {"q": "회전바 틈새 색깔?", "o": ["빨강", "초록"], "a": 2},
+        {"q": "빨간색은?", "o": ["안전", "위험"], "a": 2}
+    ]
+}

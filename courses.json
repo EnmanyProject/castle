@@ -27,6 +27,14 @@
             "difficulty": "easy",
             "description": "입문자를 위한 쉬운 튜토리얼 코스",
             "url": "courses/sample-easy.json"
+        },
+        {
+            "id": "skill-test",
+            "name": "Skill Gimmick Test Course",
+            "author": "Dev Team",
+            "difficulty": "medium",
+            "description": "스킬 기반 기믹 테스트 코스",
+            "url": "courses/skill-test.json"
         }
     ]
 }
