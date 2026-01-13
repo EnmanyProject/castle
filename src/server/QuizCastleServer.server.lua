@@ -392,6 +392,7 @@ local Config = {
     EnableConveyorBelt = true,
     EnableElectricFloor = true,
     EnableRollingBoulder = true,
+    EnablePortalMaze = true,
     EnableSequencePuzzle = false,
     
     ObstacleSpeed = 1.0,
@@ -2298,7 +2299,276 @@ GimmickRegistry:Register({
     end
 })
 
-print("✅ GimmickRegistry: 10 gimmicks registered")
+-- 🌀 PortalMaze (퀴즈 + 텔레포트 조합)
+GimmickRegistry:Register({
+    name = "PortalMaze",
+    displayName = "포탈 미로",
+    icon = "🌀",
+    difficulty = "medium",
+    description = "퀴즈 정답 포탈로 들어가면 앞으로, 오답은 시작점으로!",
+    schema = {
+        id = {type = "number", min = 1, max = 100, default = 1, label = "포탈 ID"},
+        triggerZ = {type = "number", min = 0, max = 2000, default = 100, label = "트리거 위치"},
+        portalZ = {type = "number", min = 0, max = 2000, default = 130, label = "포탈 위치"},
+        exitZ = {type = "number", min = 0, max = 2000, default = 180, label = "정답 출구 위치"},
+        options = {type = "number", min = 2, max = 4, default = 3, label = "포탈 수"}
+    },
+    builder = function(parent, data)
+        if not Config.EnablePortalMaze then return end
+
+        local portalId = data.id or 1
+        local triggerZ = data.triggerZ
+        local portalZ = data.portalZ
+        local exitZ = data.exitZ
+        local optionCount = data.options or 3
+        local quiz = GetQuizByOptionCount(optionCount)
+        local TW = Config.TRACK_WIDTH
+        local startZ = triggerZ - 10  -- 오답 시 돌아갈 위치
+
+        -- 포탈 색상
+        local portalColors = {
+            Color3.fromRGB(255, 80, 80),   -- 빨강
+            Color3.fromRGB(80, 150, 255),  -- 파랑
+            Color3.fromRGB(80, 255, 80),   -- 초록
+            Color3.fromRGB(255, 220, 80),  -- 노랑
+        }
+
+        -- 트리거 존 (퀴즈 표시)
+        local trigger = Instance.new("Part")
+        trigger.Name = "PortalTrigger_" .. portalId
+        trigger.Size = Vector3.new(TW, 10, 5)
+        trigger.Position = Vector3.new(0, 5, triggerZ)
+        trigger.Anchored = true
+        trigger.CanCollide = false
+        trigger.Transparency = 1
+        trigger.Parent = parent
+
+        -- 트리거 바닥 (보라색 빛)
+        local triggerFloor = Instance.new("Part")
+        triggerFloor.Size = Vector3.new(TW, 0.5, 5)
+        triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
+        triggerFloor.Anchored = true
+        triggerFloor.CanCollide = false
+        triggerFloor.BrickColor = BrickColor.new("Bright violet")
+        triggerFloor.Material = Enum.Material.Neon
+        triggerFloor.Transparency = 0.5
+        triggerFloor.Parent = parent
+        table.insert(ActiveGimmicks, triggerFloor)
+
+        -- 퀴즈 문제 표시판
+        local questionBoard = Instance.new("Part")
+        questionBoard.Size = Vector3.new(20, 8, 1)
+        questionBoard.Position = Vector3.new(0, 12, portalZ - 5)
+        questionBoard.Anchored = true
+        questionBoard.CanCollide = false
+        questionBoard.BrickColor = BrickColor.new("Really black")
+        questionBoard.Material = Enum.Material.SmoothPlastic
+        questionBoard.Parent = parent
+        local boardGui = Instance.new("SurfaceGui")
+        boardGui.Face = Enum.NormalId.Front
+        boardGui.Parent = questionBoard
+        local questionLabel = Instance.new("TextLabel")
+        questionLabel.Size = UDim2.new(1, 0, 1, 0)
+        questionLabel.BackgroundTransparency = 1
+        questionLabel.Text = "❓ " .. quiz.q .. " ❓"
+        questionLabel.TextColor3 = Color3.new(1, 1, 1)
+        questionLabel.TextScaled = true
+        questionLabel.Font = Enum.Font.GothamBold
+        questionLabel.Parent = boardGui
+        table.insert(ActiveGimmicks, questionBoard)
+
+        -- 포탈 너비 계산
+        local portalWidth = (TW - 8) / optionCount
+        local portalRadius = math.min(portalWidth / 2 - 1, 5)
+
+        -- 각 포탈 생성
+        for i = 1, optionCount do
+            local xPos = -((TW - 8) / 2) + portalWidth / 2 + (i - 1) * portalWidth
+
+            -- 포탈 베이스 (원형 바닥)
+            local portalBase = Instance.new("Part")
+            portalBase.Name = "PortalBase_" .. portalId .. "_" .. i
+            portalBase.Size = Vector3.new(portalRadius * 2, 0.5, portalRadius * 2)
+            portalBase.Position = Vector3.new(xPos, 0.25, portalZ)
+            portalBase.Anchored = true
+            portalBase.Shape = Enum.PartType.Cylinder
+            portalBase.Orientation = Vector3.new(0, 0, 90)
+            portalBase.Color = portalColors[i]
+            portalBase.Material = Enum.Material.Neon
+            portalBase.Parent = parent
+
+            -- 포탈 링 (시각 효과)
+            local portalRing = Instance.new("Part")
+            portalRing.Name = "PortalRing_" .. portalId .. "_" .. i
+            portalRing.Size = Vector3.new(portalRadius * 2, 8, portalRadius * 2)
+            portalRing.Position = Vector3.new(xPos, 4, portalZ)
+            portalRing.Anchored = true
+            portalRing.CanCollide = false
+            portalRing.Shape = Enum.PartType.Cylinder
+            portalRing.Orientation = Vector3.new(0, 0, 90)
+            portalRing.Color = portalColors[i]
+            portalRing.Material = Enum.Material.ForceField
+            portalRing.Transparency = 0.3
+            portalRing.Parent = parent
+
+            -- 포탈 위 선택지 표시
+            local optionSign = Instance.new("Part")
+            optionSign.Size = Vector3.new(portalWidth - 2, 4, 0.5)
+            optionSign.Position = Vector3.new(xPos, 10, portalZ)
+            optionSign.Anchored = true
+            optionSign.CanCollide = false
+            optionSign.Color = portalColors[i]
+            optionSign.Material = Enum.Material.SmoothPlastic
+            optionSign.Parent = parent
+            local optGui = Instance.new("SurfaceGui")
+            optGui.Face = Enum.NormalId.Front
+            optGui.Parent = optionSign
+            local optLabel = Instance.new("TextLabel")
+            optLabel.Size = UDim2.new(1, 0, 0.4, 0)
+            optLabel.BackgroundTransparency = 1
+            optLabel.Text = "[" .. i .. "]"
+            optLabel.TextColor3 = Color3.new(1, 1, 1)
+            optLabel.TextScaled = true
+            optLabel.Font = Enum.Font.GothamBold
+            optLabel.Parent = optGui
+            local optText = Instance.new("TextLabel")
+            optText.Size = UDim2.new(0.95, 0, 0.55, 0)
+            optText.Position = UDim2.new(0.025, 0, 0.4, 0)
+            optText.BackgroundTransparency = 1
+            optText.Text = quiz.o[i]
+            optText.TextColor3 = Color3.new(1, 1, 1)
+            optText.TextScaled = true
+            optText.Font = Enum.Font.GothamBold
+            optText.Parent = optGui
+
+            -- 포탈 진입 감지
+            local portalTrigger = Instance.new("Part")
+            portalTrigger.Name = "PortalEnter_" .. portalId .. "_" .. i
+            portalTrigger.Size = Vector3.new(portalRadius * 2, 6, portalRadius * 2)
+            portalTrigger.Position = Vector3.new(xPos, 3, portalZ)
+            portalTrigger.Anchored = true
+            portalTrigger.CanCollide = false
+            portalTrigger.Transparency = 1
+            portalTrigger.Parent = parent
+
+            local db = {}
+            portalTrigger.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                if not player or db[player] then return end
+
+                local answer = PlayerGateAnswers[player] and PlayerGateAnswers[player][1000 + portalId]
+                if not answer then return end  -- 트리거 안 밟았으면 무시
+
+                db[player] = true
+                local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+                local hum = hit.Parent:FindFirstChild("Humanoid")
+
+                if answer == i then
+                    -- 정답! 앞으로 텔레포트
+                    if rp then
+                        -- 텔레포트 이펙트
+                        portalRing.BrickColor = BrickColor.new("Lime green")
+                        TweenService:Create(portalRing, TweenInfo.new(0.2), {Transparency = 0}):Play()
+
+                        task.wait(0.3)
+                        rp.CFrame = CFrame.new(xPos, 3, exitZ + 5)
+
+                        -- 정답 보상: +5% 속도
+                        local newSpeed = ApplySpeedBoost(player, 5)
+                        Events.ItemEffect:FireClient(player, "SpeedUp", {
+                            speedPercent = newSpeed,
+                            message = "🌀 정답! +5%"
+                        })
+                        AddXP(player, 15, "Portal Correct")
+
+                        task.delay(0.5, function()
+                            portalRing.Color = portalColors[i]
+                            TweenService:Create(portalRing, TweenInfo.new(0.3), {Transparency = 0.3}):Play()
+                            db[player] = nil
+                        end)
+                    end
+                else
+                    -- 오답! 시작점으로 리턴
+                    if rp and hum then
+                        portalRing.BrickColor = BrickColor.new("Really red")
+                        TweenService:Create(portalRing, TweenInfo.new(0.2), {Transparency = 0}):Play()
+
+                        local origSpeed = hum.WalkSpeed
+                        local origJump = hum.JumpPower
+                        hum.WalkSpeed = 0
+                        hum.JumpPower = 0
+
+                        task.wait(0.3)
+                        rp.CFrame = CFrame.new(0, 3, startZ)
+
+                        Events.ItemEffect:FireClient(player, "GateWrong", {
+                            duration = 1.5,
+                            message = "🌀 오답! 시작점으로..."
+                        })
+
+                        task.delay(1.5, function()
+                            if hum then
+                                hum.WalkSpeed = origSpeed
+                                hum.JumpPower = origJump
+                            end
+                            portalRing.Color = portalColors[i]
+                            TweenService:Create(portalRing, TweenInfo.new(0.3), {Transparency = 0.3}):Play()
+                            db[player] = nil
+                        end)
+                    end
+                end
+            end)
+
+            -- 포탈 회전 애니메이션
+            table.insert(RotatingObjects, {
+                part = portalRing,
+                speed = 1.5,
+                rotation = 0,
+                rotationType = "Y"
+            })
+
+            table.insert(ActiveGimmicks, portalBase)
+            table.insert(ActiveGimmicks, portalRing)
+            table.insert(ActiveGimmicks, optionSign)
+            table.insert(ActiveGimmicks, portalTrigger)
+        end
+
+        -- 출구 표시
+        local exitMarker = Instance.new("Part")
+        exitMarker.Size = Vector3.new(TW, 0.3, 5)
+        exitMarker.Position = Vector3.new(0, 0.15, exitZ)
+        exitMarker.Anchored = true
+        exitMarker.CanCollide = false
+        exitMarker.BrickColor = BrickColor.new("Lime green")
+        exitMarker.Material = Enum.Material.Neon
+        exitMarker.Transparency = 0.5
+        exitMarker.Parent = parent
+        table.insert(ActiveGimmicks, exitMarker)
+
+        -- 트리거 이벤트 (퀴즈 표시)
+        local triggered = {}
+        trigger.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if not player or triggered[player] then return end
+            triggered[player] = true
+
+            if not PlayerGateAnswers[player] then PlayerGateAnswers[player] = {} end
+            PlayerGateAnswers[player][1000 + portalId] = quiz.a  -- 1000+ ID로 구분
+
+            Events.GateQuiz:FireClient(player, {
+                gateId = 1000 + portalId,
+                question = quiz.q,
+                options = quiz.o,
+                colors = {"#FF5050", "#5096FF", "#50FF50", "#FFDC50"}
+            })
+        end)
+
+        table.insert(ActiveGimmicks, trigger)
+        return trigger
+    end
+})
+
+print("✅ GimmickRegistry: 11 gimmicks registered")
 
 -- ============================================
 -- 🏰 CREATE CASTLE EXTERIOR
