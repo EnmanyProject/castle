@@ -1039,10 +1039,10 @@ GimmickRegistry:Register({
                 bv.MaxForce = Vector3.new(0, 100000, 0)
 
                 if isHighJump then
-                    bv.Velocity = Vector3.new(0, 150, 0)  -- 하이점프!
+                    bv.Velocity = Vector3.new(0, 80, 0)  -- 하이점프 (보상 박스 도달 가능)
                     Events.ItemEffect:FireClient(player, "HighJump", {message = "🚀 HIGH JUMP!"})
                 else
-                    bv.Velocity = Vector3.new(0, 90, 0)  -- 일반 점프
+                    bv.Velocity = Vector3.new(0, 55, 0)  -- 일반 점프 (벽 넘기 적당)
                 end
 
                 bv.Parent = rp
@@ -1492,16 +1492,17 @@ GimmickRegistry:Register({
             gate.Touched:Connect(function(hit)
                 local player = Players:GetPlayerFromCharacter(hit.Parent)
                 if not player or db[player] then return end
+                db[player] = true  -- 정답/오답 모두 디바운스 설정
                 local answer = PlayerGateAnswers[player] and PlayerGateAnswers[player][gateId]
                 if answer == i then
-                    -- 정답: +5% 속도 부스트!
-                    local newSpeed = ApplySpeedBoost(player, 5)
+                    -- 정답: +10% 속도 부스트
+                    local newSpeed = ApplySpeedBoost(player, 10)
                     Events.ItemEffect:FireClient(player, "SpeedUp", {
                         speedPercent = newSpeed,
-                        message = "🚀 가속! +5%"
+                        message = "🚀 가속! +10%"
                     })
+                    task.delay(1, function() db[player] = nil end)
                 else
-                    db[player] = true
                     local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
                     local hum = hit.Parent:FindFirstChild("Humanoid")
                     if hum and rp then
@@ -1652,11 +1653,11 @@ GimmickRegistry:Register({
                 if not player or platDb[player] then return end
                 platDb[player] = true
                 if i == quiz.a then
-                    -- 정답: +5% 속도 부스트!
-                    local newSpeed = ApplySpeedBoost(player, 5)
+                    -- 정답: +10% 속도 부스트
+                    local newSpeed = ApplySpeedBoost(player, 10)
                     Events.ItemEffect:FireClient(player, "SpeedUp", {
                         speedPercent = newSpeed,
-                        message = "🚀 가속! +5%"
+                        message = "🚀 가속! +10%"
                     })
                 else
                     Events.ItemEffect:FireClient(player, "GateWrong", {})
@@ -2473,11 +2474,11 @@ GimmickRegistry:Register({
                         task.wait(0.3)
                         rp.CFrame = CFrame.new(xPos, 3, exitZ + 5)
 
-                        -- 정답 보상: +5% 속도
-                        local newSpeed = ApplySpeedBoost(player, 5)
+                        -- 정답 보상: +10% 속도
+                        local newSpeed = ApplySpeedBoost(player, 10)
                         Events.ItemEffect:FireClient(player, "SpeedUp", {
                             speedPercent = newSpeed,
-                            message = "🌀 정답! +5%"
+                            message = "🌀 정답! +10%"
                         })
                         AddXP(player, 15, "Portal Correct")
 
