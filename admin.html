@@ -619,9 +619,9 @@
 
     <!-- Tabs -->
     <div class="tab-container">
-        <button class="tab-btn active" onclick="switchTab('course-editor')">📝 코스 에디터</button>
-        <button class="tab-btn" onclick="switchTab('gimmick-guide')">📖 기믹 가이드</button>
-        <button class="tab-btn" onclick="switchTab('quiz-pool')">❓ 퀴즈 풀</button>
+        <button class="tab-btn active" data-tab="course-editor" onclick="switchTab('course-editor', this)">📝 코스 에디터</button>
+        <button class="tab-btn" data-tab="gimmick-guide" onclick="switchTab('gimmick-guide', this)">📖 기믹 가이드</button>
+        <button class="tab-btn" data-tab="quiz-pool" onclick="switchTab('quiz-pool', this)">❓ 퀴즈 풀</button>
     </div>
 
     <!-- Tab 1: Course Editor -->
@@ -1052,11 +1052,15 @@
         };
 
         // ==================== Tab Switching ====================
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        function switchTab(tabName, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            if (btn) {
+                btn.classList.add('active');
+            } else {
+                document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            }
             document.getElementById(`tab-${tabName}`).classList.add('active');
 
             if (tabName === 'gimmick-guide') {
