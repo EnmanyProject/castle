@@ -713,10 +713,44 @@ local GateQuizzes = {
     {q = "Biggest planet?", o = {"Earth", "Mars", "Jupiter", "Venus"}, a = 3},
 }
 
+-- 코스별 퀴즈 풀 또는 기본 퀴즈 풀에서 랜덤 선택
 local function GetQuizByOptionCount(count)
-    local f = {}
-    for _, q in ipairs(GateQuizzes) do if #q.o == count then table.insert(f, q) end end
-    return #f > 0 and f[math.random(#f)] or GateQuizzes[1]
+    local pool = GateQuizzes  -- 기본 풀
+
+    -- 현재 코스에 quizPool이 있으면 해당 풀 사용
+    local currentCourse = CourseManager.currentCourse
+    if currentCourse and currentCourse.quizPool and #currentCourse.quizPool > 0 then
+        pool = currentCourse.quizPool
+    end
+
+    -- 옵션 수에 맞는 퀴즈 필터링
+    local filtered = {}
+    for _, q in ipairs(pool) do
+        if #q.o == count then
+            table.insert(filtered, q)
+        end
+    end
+
+    -- 코스 풀에서 찾았으면 반환
+    if #filtered > 0 then
+        return filtered[math.random(#filtered)]
+    end
+
+    -- 코스 풀에 해당 옵션 수 퀴즈가 없으면 기본 풀에서 찾기 (Fallback)
+    if pool ~= GateQuizzes then
+        local defaultFiltered = {}
+        for _, q in ipairs(GateQuizzes) do
+            if #q.o == count then
+                table.insert(defaultFiltered, q)
+            end
+        end
+        if #defaultFiltered > 0 then
+            return defaultFiltered[math.random(#defaultFiltered)]
+        end
+    end
+
+    -- 최후 fallback
+    return GateQuizzes[1]
 end
 
 local gateColors = {

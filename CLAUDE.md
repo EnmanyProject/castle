@@ -3,14 +3,26 @@
 ## 프로젝트 요약
 이 프로젝트는 **Roblox 퀴즈 레이싱 게임**입니다. 플레이어가 장애물 코스를 달리며 퀴즈 게이트를 통과하는 게임입니다.
 
+**현재 버전**: v3.2.1
+
 ## 파일 구조
 ```
 castle/
-├── QuizCastleServer.lua   # 서버 스크립트 (Roblox ServerScriptService)
-├── QuizCastleClient.lua   # 클라이언트 스크립트 (Roblox StarterPlayerScripts)
-├── project.md             # 상세 프로젝트 문서
-├── README.md              # 설치 가이드
-└── CLAUDE.md              # 이 파일
+├── src/                              # Rojo 소스 (최신)
+│   ├── server/QuizCastleServer.server.lua
+│   └── client/QuizCastleClient.client.lua
+├── docs/                             # 문서
+│   ├── ARCHITECTURE_DESIGN.md        # 아키텍처 설계
+│   ├── CHANGELOG.md                  # 변경 이력
+│   ├── DEV_TEAM_WORKFLOW.md          # 개발팀 워크플로우
+│   └── ROADMAP.md                    # 개발 로드맵
+├── courses/                          # 코스 데이터
+├── default.project.json              # Rojo 설정
+├── aftman.toml                       # Rojo 버전 관리
+├── QuizCastleServer.lua              # 레거시 서버
+├── QuizCastleClient.lua              # 레거시 클라이언트
+├── project.md                        # 상세 프로젝트 문서
+└── CLAUDE.md                         # 이 파일
 ```
 
 ## 기술 스택
@@ -81,3 +93,30 @@ end)
 
 ## 문서 참조
 더 자세한 정보는 `project.md` 파일 참고
+
+---
+
+## 개발팀 워크플로우
+
+### 팀 구성
+| 멤버 | 역할 | 담당 |
+|------|------|------|
+| Sam | Game Designer | 기획서 작성, 요구사항 분석 |
+| Jenny | Luau Developer | 코드 구현, 기술 문서 |
+| Will | QA Engineer | 코드 검토, 버그 분석 |
+
+### 단축 명령어
+- `"Sam 기획해줘"` - 새 기능 기획 시작
+- `"Jenny 구현해줘"` - 코드 구현 시작
+- `"Will 검토해줘"` - QA 검토 시작
+- `"전체 진행"` - 기획→구현→QA 순차 진행
+- `"빠르게"` - 질문 최소화하고 바로 구현
+
+### 버그 수정 모드
+에러 로그와 함께 요청 시 Will이 먼저 분석 후 수정 코드 제공
+
+### 기믹 아이디어 모드
+새 기믹 요청 시 Sam이 3-5개 아이디어 제안 후 선택
+
+상세 워크플로우: `docs/DEV_TEAM_WORKFLOW.md`
+개발 로드맵: `docs/ROADMAP.md`

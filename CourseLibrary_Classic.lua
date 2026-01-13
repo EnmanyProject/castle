@@ -12,11 +12,32 @@ return {
         id = "classic",
         name = "Quiz Castle Classic",
         author = "System",
-        version = "3.2",
+        version = "3.3",
         length = 2000,
         difficulty = "medium",
         description = "기본 코스 - 균형 잡힌 난이도"
     },
+
+    -- 코스 전용 퀴즈 풀 (레이스마다 이 풀에서 랜덤 출제)
+    -- 없으면 서버 기본 퀴즈 풀 사용
+    quizPool = {
+        -- 2지선다
+        {q = "Is Earth round?", o = {"Yes", "No"}, a = 1},
+        {q = "Is fire cold?", o = {"Yes", "No"}, a = 2},
+        {q = "Can birds fly?", o = {"Yes", "No"}, a = 1},
+        {q = "Do fish swim?", o = {"Yes", "No"}, a = 1},
+        -- 3지선다
+        {q = "Sky color?", o = {"Red", "Blue", "Green"}, a = 2},
+        {q = "Cat legs?", o = {"2", "4", "6"}, a = 2},
+        {q = "5 + 5?", o = {"8", "10", "12"}, a = 2},
+        {q = "Water formula?", o = {"H2O", "CO2", "O2"}, a = 1},
+        -- 4지선다
+        {q = "2 + 3?", o = {"3", "4", "5", "6"}, a = 3},
+        {q = "Grass color?", o = {"Red", "Blue", "Green", "Yellow"}, a = 3},
+        {q = "Days in week?", o = {"5", "6", "7", "8"}, a = 3},
+        {q = "3 x 3?", o = {"6", "7", "8", "9"}, a = 4},
+    },
+
     gimmicks = {
         -- 구간 1: 워밍업
         {type = "RotatingBar", z = 60, width = 28, height = 3, speed = 1.5},
