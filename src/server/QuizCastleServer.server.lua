@@ -987,14 +987,20 @@ GimmickRegistry:Register({
         rewardLabel.Font = Enum.Font.GothamBold
         rewardLabel.Parent = rewardGui
 
-        -- 🔄 통합 애니메이션 (이동 + 회전)
+        -- 점프 처리
+        local db = {}
+        local rewardDb = {}
+
+        -- 🔄 통합 애니메이션 (이동 + 회전 + 보상 체크)
         task.spawn(function()
             local direction = 1
             local currentX = baseX
             local rotation = 0
+            local checkInterval = 0
 
             while pad and pad.Parent and rewardBox and rewardBox.Parent do
                 rotation = rotation + 3
+                checkInterval = checkInterval + 1
 
                 -- 좌우 이동
                 if moveRange > 0 then
@@ -1010,16 +1016,66 @@ GimmickRegistry:Register({
                 end
 
                 -- 보상 박스: 이동 + 회전 동시 적용
-                rewardBox.CFrame = CFrame.new(currentX, baseY + rewardHeight, baseZ)
-                    * CFrame.Angles(0, math.rad(rotation), 0)
+                local boxPos = Vector3.new(currentX, baseY + rewardHeight, baseZ)
+                rewardBox.CFrame = CFrame.new(boxPos) * CFrame.Angles(0, math.rad(rotation), 0)
+
+                -- 🌟 거리 기반 보상 체크 (CFrame 이동시 Touched 불안정하므로)
+                if checkInterval % 3 == 0 then  -- 매 3프레임마다 체크
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if not rewardDb[player] and player.Character then
+                            local rp = player.Character:FindFirstChild("HumanoidRootPart")
+                            if rp then
+                                local dist = (rp.Position - boxPos).Magnitude
+                                if dist < 6 then  -- 보상 박스 근처 (반경 6)
+                                    rewardDb[player] = true
+                                    print("⭐ High Jump Reward touched by:", player.Name)
+
+                                    local pData = PlayerData[player]
+                                    if pData then
+                                        local bonusXP = 50
+                                        pData.xp = (pData.xp or 0) + bonusXP
+                                        local level = pData.level or 1
+                                        local progress, xpInLevel, xpNeeded = GetLevelProgress(pData.xp, level)
+                                        Events.XPUpdate:FireClient(player, {
+                                            xp = pData.xp,
+                                            xpGained = bonusXP,
+                                            reason = "High Jump Bonus",
+                                            level = level,
+                                            levelName = LevelConfig[level].name,
+                                            levelIcon = LevelConfig[level].icon,
+                                            trailType = LevelConfig[level].trailType,
+                                            progress = progress,
+                                            xpInLevel = xpInLevel,
+                                            xpNeeded = xpNeeded
+                                        })
+                                        Events.ItemEffect:FireClient(player, "Reward", {
+                                            message = "⭐ HIGH JUMP BONUS! +" .. bonusXP .. " XP"
+                                        })
+                                    end
+
+                                    -- 시각 효과
+                                    local origSize = rewardBox.Size
+                                    rewardBox.Size = Vector3.new(1, 1, 1)
+                                    rewardBox.Transparency = 0.8
+                                    rewardBox.BrickColor = BrickColor.new("White")
+
+                                    task.delay(5, function()
+                                        if rewardBox and rewardBox.Parent then
+                                            rewardBox.Size = origSize
+                                            rewardBox.Transparency = 0.3
+                                            rewardBox.BrickColor = BrickColor.new("Bright yellow")
+                                            rewardDb[player] = nil
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
 
                 task.wait(0.03)
             end
         end)
-
-        -- 점프 처리
-        local db = {}
-        local rewardDb = {}
 
         pad.Touched:Connect(function(hit)
             local player = Players:GetPlayerFromCharacter(hit.Parent)
@@ -1048,62 +1104,6 @@ GimmickRegistry:Register({
                 bv.Parent = rp
                 Debris:AddItem(bv, 0.2)
                 task.delay(0.5, function() db[hit.Parent] = nil end)
-            end
-        end)
-
-        -- 🌟 보상 박스 터치 처리
-        rewardBox.Touched:Connect(function(hit)
-            local char = hit.Parent
-            if not char then return end
-            local player = Players:GetPlayerFromCharacter(char)
-            if not player then
-                -- 캐릭터 부모가 아닐 수 있음 (액세서리 등)
-                char = hit.Parent.Parent
-                player = Players:GetPlayerFromCharacter(char)
-            end
-
-            if player and not rewardDb[player] then
-                rewardDb[player] = true
-                print("⭐ High Jump Reward touched by:", player.Name)
-
-                -- 보상: XP
-                local pData = PlayerData[player]
-                if pData then
-                    local bonusXP = 50
-                    pData.xp = (pData.xp or 0) + bonusXP
-                    local level = pData.level or 1
-                    local progress, xpInLevel, xpNeeded = GetLevelProgress(pData.xp, level)
-                    Events.XPUpdate:FireClient(player, {
-                        xp = pData.xp,
-                        xpGained = bonusXP,
-                        reason = "High Jump Bonus",
-                        level = level,
-                        levelName = LevelConfig[level].name,
-                        levelIcon = LevelConfig[level].icon,
-                        trailType = LevelConfig[level].trailType,
-                        progress = progress,
-                        xpInLevel = xpInLevel,
-                        xpNeeded = xpNeeded
-                    })
-                    Events.ItemEffect:FireClient(player, "Reward", {
-                        message = "⭐ HIGH JUMP BONUS! +" .. bonusXP .. " XP"
-                    })
-                end
-
-                -- 시각 효과: 박스 축소 후 복구
-                local origSize = rewardBox.Size
-                rewardBox.Size = Vector3.new(1, 1, 1)
-                rewardBox.Transparency = 0.8
-                rewardBox.BrickColor = BrickColor.new("White")
-
-                task.delay(5, function()
-                    if rewardBox and rewardBox.Parent then
-                        rewardBox.Size = origSize
-                        rewardBox.Transparency = 0.3
-                        rewardBox.BrickColor = BrickColor.new("Bright yellow")
-                        rewardDb[player] = nil
-                    end
-                end)
             end
         end)
 
@@ -3111,65 +3111,88 @@ local function CreateItemBoxes(parent)
     local TL = Config.TRACK_LENGTH
     local boxCount = 0
 
+    -- JumpPad 위치 수집 (제외할 Z 범위)
+    local excludeZones = {}
+    local course = CourseManager:GetCurrentCourse()
+    if course and course.gimmicks then
+        for _, gimmick in ipairs(course.gimmicks) do
+            if gimmick.type == "JumpPad" then
+                table.insert(excludeZones, gimmick.z)
+            end
+        end
+    end
+
+    -- 제외 영역 체크 함수
+    local function isExcluded(z)
+        for _, excludeZ in ipairs(excludeZones) do
+            if math.abs(z - excludeZ) < 30 then  -- JumpPad 기준 ±30 범위 제외
+                return true
+            end
+        end
+        return false
+    end
+
     for z = 100, TL - 150, 200 do
-        boxCount = boxCount + 1
-        local x = math.random(-12, 12)
-        local box = Instance.new("Part")
-        box.Name = "ItemBox"
-        box.Size = Vector3.new(5, 5, 5)
-        box.Position = Vector3.new(x, 4, COURSE_OFFSET + z)  -- 오프셋 적용
-        box.Anchored = true
-        box.CanCollide = false
-        box.BrickColor = BrickColor.new("Bright yellow")
-        box.Material = Enum.Material.Neon
-        box.Transparency = 0.2
-        box.Parent = parent
+        -- JumpPad 근처면 스킵
+        if isExcluded(z) then
+            print("📦 ItemBox skipped at z=" .. z .. " (near JumpPad)")
+        else
+            boxCount = boxCount + 1
+            local x = math.random(-12, 12)
+            local box = Instance.new("Part")
+            box.Name = "ItemBox"
+            box.Size = Vector3.new(5, 5, 5)
+            box.Position = Vector3.new(x, 4, COURSE_OFFSET + z)
+            box.Anchored = true
+            box.CanCollide = false
+            box.BrickColor = BrickColor.new("Bright yellow")
+            box.Material = Enum.Material.Neon
+            box.Transparency = 0.2
+            box.Parent = parent
 
-        -- 🔄 PERFORMANCE: 개별 루프 대신 중앙 관리 테이블에 등록
-        table.insert(ItemBoxes, {
-            part = box,
-            rotation = math.random(0, 360)
-        })
+            table.insert(ItemBoxes, {
+                part = box,
+                rotation = math.random(0, 360)
+            })
 
-        local db, active = {}, true
-        box.Touched:Connect(function(hit)
-            if not active then return end
+            local db, active = {}, true
+            box.Touched:Connect(function(hit)
+                if not active then return end
 
-            local char = hit.Parent
-            local player = Players:GetPlayerFromCharacter(char)
+                local char = hit.Parent
+                local player = Players:GetPlayerFromCharacter(char)
 
-            -- 액세서리 등일 경우 부모의 부모 확인
-            if not player and char and char.Parent then
-                player = Players:GetPlayerFromCharacter(char.Parent)
-                char = char.Parent
-            end
+                if not player and char and char.Parent then
+                    player = Players:GetPlayerFromCharacter(char.Parent)
+                    char = char.Parent
+                end
 
-            if not player then return end
-            if not PlayerData[player] then
-                print("⚠️ ItemBox: No PlayerData for", player.Name)
-                return
-            end
-            if db[player] then return end
-            if PlayerData[player].currentItem then
-                -- 이미 아이템 보유 중
-                return
-            end
+                if not player then return end
+                if not PlayerData[player] then
+                    print("⚠️ ItemBox: No PlayerData for", player.Name)
+                    return
+                end
+                if db[player] then return end
+                if PlayerData[player].currentItem then
+                    return
+                end
 
-            db[player] = true
-            active = false
-            box.Transparency = 0.85
+                db[player] = true
+                active = false
+                box.Transparency = 0.85
 
-            local itemType = itemList[math.random(#itemList)]
-            PlayerData[player].currentItem = itemType
-            print("📦 Item given to", player.Name, ":", itemType)
-            Events.ItemEffect:FireClient(player, "GotItem", {itemType = itemType})
+                local itemType = itemList[math.random(#itemList)]
+                PlayerData[player].currentItem = itemType
+                print("📦 Item given to", player.Name, ":", itemType)
+                Events.ItemEffect:FireClient(player, "GotItem", {itemType = itemType})
 
-            task.delay(10, function()
-                active = true
-                box.Transparency = 0.2
-                db[player] = nil
+                task.delay(10, function()
+                    active = true
+                    box.Transparency = 0.2
+                    db[player] = nil
+                end)
             end)
-        end)
+        end
     end
 
     print("📦 ItemBoxes created:", boxCount)
