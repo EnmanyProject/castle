@@ -770,49 +770,127 @@ GimmickRegistry:Register({
     displayName = "회전 막대",
     icon = "🔄",
     difficulty = "easy",
-    description = "회전하는 막대, 맞으면 튕겨남",
+    description = "회전하는 막대 - 틈새로 통과하거나 점프/숙여서 피하기",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "위치 (Z)"},
         width = {type = "number", min = 10, max = 50, default = 28, label = "너비"},
         height = {type = "number", min = 1, max = 10, default = 3, label = "높이"},
-        speed = {type = "number", min = 0.5, max = 5, default = 1.5, label = "회전 속도"}
+        speed = {type = "number", min = 0.5, max = 5, default = 1.5, label = "회전 속도"},
+        gapSize = {type = "number", min = 0, max = 10, default = 6, label = "틈새 크기 (0=없음)"},
+        barType = {type = "string", default = "normal", label = "타입 (normal/low/high)"}
     },
     builder = function(parent, data)
         if not Config.EnableRotatingBars then return end
-        local bar = Instance.new("Part")
-        bar.Size = Vector3.new(data.width or 25, 2, 2)
-        bar.Position = Vector3.new(0, data.height or 3, data.z)
-        bar.Anchored = true
-        bar.BrickColor = BrickColor.new("Bright red")
-        bar.Material = Enum.Material.Metal
-        bar.Parent = parent
+
+        local totalWidth = data.width or 28
+        local gapSize = data.gapSize or 6
+        local barHeight = data.height or 3
+        local barType = data.barType or "normal"
         local actualSpeed = (data.speed or 2) * Config.ObstacleSpeed
-        table.insert(RotatingObjects, {
-            part = bar,
-            speed = actualSpeed,
-            rotation = math.random(0, 360),
-            rotationType = "Y"
-        })
+
+        -- 바 타입에 따른 높이 조정 (스킬 요소)
+        -- low: 점프로 넘기 (높이 1.5)
+        -- high: 숙여서 통과 (높이 5)
+        -- normal: 기본 (높이 3)
+        if barType == "low" then
+            barHeight = 1.5
+        elseif barType == "high" then
+            barHeight = 5
+        end
+
+        local bars = {}
         local db = {}
-        bar.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            if player and not db[player] then
-                db[player] = true
-                local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-                if rp then
-                    -- 장애물 충돌: -5% 감속 (100% 이하로는 안내려감)
-                    local newSpeed = ApplySpeedBoost(player, -5)
-                    Events.ItemEffect:FireClient(player, "SpeedDown", {
-                        speedPercent = newSpeed,
-                        message = "💥 감속! -5%",
-                        direction = (rp.Position - bar.Position).Unit * 35 + Vector3.new(0, 18, 0)
-                    })
+
+        local function setupBarTouch(bar)
+            bar.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                if player and not db[player] then
+                    db[player] = true
+                    local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+                    if rp then
+                        local newSpeed = ApplySpeedBoost(player, -5)
+                        Events.ItemEffect:FireClient(player, "SpeedDown", {
+                            speedPercent = newSpeed,
+                            message = "💥 감속! -5%",
+                            direction = (rp.Position - bar.Position).Unit * 35 + Vector3.new(0, 18, 0)
+                        })
+                    end
+                    task.delay(0.5, function() db[player] = nil end)
                 end
-                task.delay(0.5, function() db[player] = nil end)
-            end
-        end)
-        table.insert(ActiveGimmicks, bar)
-        return bar
+            end)
+        end
+
+        -- 틈새가 있으면 두 개로 분리, 없으면 하나
+        if gapSize > 0 then
+            local sideWidth = (totalWidth - gapSize) / 2
+
+            -- 왼쪽 바
+            local barLeft = Instance.new("Part")
+            barLeft.Size = Vector3.new(sideWidth, 2, 2)
+            barLeft.Position = Vector3.new(-(sideWidth/2 + gapSize/2), barHeight, data.z)
+            barLeft.Anchored = true
+            barLeft.BrickColor = BrickColor.new("Bright red")
+            barLeft.Material = Enum.Material.Metal
+            barLeft.Parent = parent
+            setupBarTouch(barLeft)
+            table.insert(bars, barLeft)
+            table.insert(ActiveGimmicks, barLeft)
+
+            -- 오른쪽 바
+            local barRight = Instance.new("Part")
+            barRight.Size = Vector3.new(sideWidth, 2, 2)
+            barRight.Position = Vector3.new(sideWidth/2 + gapSize/2, barHeight, data.z)
+            barRight.Anchored = true
+            barRight.BrickColor = BrickColor.new("Bright red")
+            barRight.Material = Enum.Material.Metal
+            barRight.Parent = parent
+            setupBarTouch(barRight)
+            table.insert(bars, barRight)
+            table.insert(ActiveGimmicks, barRight)
+
+            -- 틈새 표시 (초록색 바닥 가이드)
+            local gapGuide = Instance.new("Part")
+            gapGuide.Size = Vector3.new(gapSize, 0.2, 4)
+            gapGuide.Position = Vector3.new(0, 0.1, data.z)
+            gapGuide.Anchored = true
+            gapGuide.CanCollide = false
+            gapGuide.BrickColor = BrickColor.new("Lime green")
+            gapGuide.Material = Enum.Material.Neon
+            gapGuide.Transparency = 0.5
+            gapGuide.Parent = parent
+            table.insert(ActiveGimmicks, gapGuide)
+
+            -- 회전 (두 바를 함께 회전시키는 피벗)
+            local pivotRotation = math.random(0, 360)
+            table.insert(RotatingObjects, {
+                parts = bars,
+                pivotZ = data.z,
+                pivotY = barHeight,
+                speed = actualSpeed,
+                rotation = pivotRotation,
+                rotationType = "pivot"
+            })
+        else
+            -- 틈새 없는 기본 바
+            local bar = Instance.new("Part")
+            bar.Size = Vector3.new(totalWidth, 2, 2)
+            bar.Position = Vector3.new(0, barHeight, data.z)
+            bar.Anchored = true
+            bar.BrickColor = BrickColor.new("Bright red")
+            bar.Material = Enum.Material.Metal
+            bar.Parent = parent
+            setupBarTouch(bar)
+            table.insert(ActiveGimmicks, bar)
+
+            table.insert(RotatingObjects, {
+                part = bar,
+                speed = actualSpeed,
+                rotation = math.random(0, 360),
+                rotationType = "Y"
+            })
+        end
+
+        return bars[1]
     end
 })
 
@@ -1129,108 +1207,208 @@ GimmickRegistry:Register({
     end
 })
 
--- 🥊 PunchingCorridor
+-- 🥊 PunchingCorridor (스킬 업그레이드: 3레인 시스템 + 레인별 공격 패턴)
 GimmickRegistry:Register({
     name = "PunchingCorridor",
     displayName = "펀칭 복도",
     icon = "🥊",
     difficulty = "medium",
-    description = "좁은 복도에서 글러브가 펀치",
+    description = "3레인 복도 - 글러브 패턴 보고 안전 레인으로 이동!",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
-        length = {type = "number", min = 50, max = 200, default = 100, label = "길이"}
+        length = {type = "number", min = 50, max = 200, default = 100, label = "길이"},
+        laneCount = {type = "number", min = 2, max = 3, default = 3, label = "레인 수"}
     },
     builder = function(parent, data)
         if not Config.EnablePunchingGloves then return end
         local zStart = data.z
         local length = data.length or 100
-        local corridorWidth = 12
         local TW = Config.TRACK_WIDTH
-        for _, xOffset in ipairs({-corridorWidth/2 - 5, corridorWidth/2 + 5}) do
+        local laneCount = data.laneCount or 3
+        local corridorWidth = TW - 8  -- 넓은 복도
+        local laneWidth = corridorWidth / laneCount
+
+        -- 양쪽 벽
+        for _, side in ipairs({-1, 1}) do
             local wall = Instance.new("Part")
-            wall.Size = Vector3.new((TW - corridorWidth) / 2, 10, length)
-            wall.Position = Vector3.new((xOffset > 0) and (TW/4 + corridorWidth/4) or (-TW/4 - corridorWidth/4), 5, zStart + length/2)
+            wall.Size = Vector3.new(4, 10, length)
+            wall.Position = Vector3.new(side * (corridorWidth/2 + 2), 5, zStart + length/2)
             wall.Anchored = true
             wall.BrickColor = BrickColor.new("Dark stone grey")
             wall.Material = Enum.Material.Brick
             wall.Parent = parent
             table.insert(ActiveGimmicks, wall)
         end
-        local numGloves = math.floor(length / 25)
-        for i = 1, numGloves do
-            local zPos = zStart + i * (length / (numGloves + 1))
-            local side = (i % 2 == 0) and 1 or -1
-            local xPos = side * (corridorWidth/2 + 3)
-            local glove = Instance.new("Part")
-            glove.Name = "PunchingGlove"
-            glove.Size = Vector3.new(5, 5, 5)
-            glove.Position = Vector3.new(xPos, 4, zPos)
-            glove.Anchored = true
-            glove.BrickColor = BrickColor.new("Bright red")
-            glove.Material = Enum.Material.SmoothPlastic
-            glove.Parent = parent
-            local gloveGui = Instance.new("SurfaceGui")
-            gloveGui.Face = (side == 1) and Enum.NormalId.Left or Enum.NormalId.Right
-            gloveGui.Parent = glove
-            local gloveLabel = Instance.new("TextLabel")
-            gloveLabel.Size = UDim2.new(1, 0, 1, 0)
-            gloveLabel.BackgroundTransparency = 1
-            gloveLabel.Text = "🥊"
-            gloveLabel.TextScaled = true
-            gloveLabel.Parent = gloveGui
-            local gloveFrontGui = Instance.new("SurfaceGui")
-            gloveFrontGui.Face = Enum.NormalId.Front
-            gloveFrontGui.Parent = glove
-            local gloveFrontLabel = Instance.new("TextLabel")
-            gloveFrontLabel.Size = UDim2.new(1, 0, 1, 0)
-            gloveFrontLabel.BackgroundTransparency = 1
-            gloveFrontLabel.Text = "🥊"
-            gloveFrontLabel.TextScaled = true
-            gloveFrontLabel.Parent = gloveFrontGui
-            local retracted = Vector3.new(xPos, 4, zPos)
-            local extended = Vector3.new(-side * (corridorWidth/2 - 2), 4, zPos)
-            task.spawn(function()
-                task.wait(i * 0.3)
-                while glove and glove.Parent do
-                    task.wait(2 / Config.ObstacleSpeed)
-                    glove.BrickColor = BrickColor.new("Really red")
-                    task.wait(0.3)
-                    TweenService:Create(glove, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Position = extended}):Play()
-                    task.wait(0.2)
-                    TweenService:Create(glove, TweenInfo.new(0.4), {Position = retracted}):Play()
-                    glove.BrickColor = BrickColor.new("Bright red")
-                    task.wait(0.4)
-                end
-            end)
-            local db = {}
-            glove.Touched:Connect(function(hit)
-                local player = Players:GetPlayerFromCharacter(hit.Parent)
-                local hum = hit.Parent:FindFirstChild("Humanoid")
-                if player and hum and not db[player] then
-                    db[player] = true
-                    -- 장애물 충돌: -5% 영구 감속 (100% 이하로는 안내려감)
-                    local newSpeed = ApplySpeedBoost(player, -5)
-                    local origJump = hum.JumpPower
-                    -- 일시적 스턴 효과 (잠시 거의 못움직임)
-                    hum.WalkSpeed = BASE_WALK_SPEED * 0.3
-                    hum.JumpPower = 0
-                    Events.ItemEffect:FireClient(player, "SpeedDown", {
-                        speedPercent = newSpeed,
-                        message = "👊 감속! -5%",
-                        stun = true
-                    })
-                    task.delay(1.5, function()
-                        if hum then
-                            -- 스턴 해제 후 현재 속도 배율 적용
-                            hum.WalkSpeed = BASE_WALK_SPEED * (GetSpeedBoost(player) / 100)
-                            hum.JumpPower = origJump
-                        end
-                        db[player] = nil
-                    end)
-                end
-            end)
-            table.insert(ActiveGimmicks, glove)
+
+        -- 레인 구분선 (바닥)
+        for i = 1, laneCount do
+            local xPos = -corridorWidth/2 + (i - 0.5) * laneWidth
+            local laneLine = Instance.new("Part")
+            laneLine.Size = Vector3.new(laneWidth - 1, 0.2, length)
+            laneLine.Position = Vector3.new(xPos, 0.1, zStart + length/2)
+            laneLine.Anchored = true
+            laneLine.CanCollide = false
+            laneLine.BrickColor = (i == 2) and BrickColor.new("Lime green") or BrickColor.new("Medium stone grey")
+            laneLine.Material = Enum.Material.SmoothPlastic
+            laneLine.Transparency = 0.5
+            laneLine.Parent = parent
+            table.insert(ActiveGimmicks, laneLine)
         end
+
+        -- 안내 표지판
+        local signPart = Instance.new("Part")
+        signPart.Size = Vector3.new(16, 6, 1)
+        signPart.Position = Vector3.new(0, 6, zStart - 5)
+        signPart.Anchored = true
+        signPart.CanCollide = false
+        signPart.BrickColor = BrickColor.new("Bright yellow")
+        signPart.Parent = parent
+        local signGui = Instance.new("SurfaceGui")
+        signGui.Face = Enum.NormalId.Front
+        signGui.Parent = signPart
+        local signLabel = Instance.new("TextLabel")
+        signLabel.Size = UDim2.new(1, 0, 1, 0)
+        signLabel.BackgroundTransparency = 1
+        signLabel.Text = "🥊 펀칭 복도 🥊\n⚠️ 노란색 레인 피하기!"
+        signLabel.TextColor3 = Color3.new(0, 0, 0)
+        signLabel.TextScaled = true
+        signLabel.Font = Enum.Font.GothamBold
+        signLabel.Parent = signGui
+        table.insert(ActiveGimmicks, signPart)
+
+        -- 글러브 세트 (각 열에 laneCount개 글러브)
+        local numRows = math.floor(length / 30)
+        local gloveRows = {}
+
+        for row = 1, numRows do
+            local zPos = zStart + row * (length / (numRows + 1))
+            local rowGloves = {}
+
+            for lane = 1, laneCount do
+                local xPos = -corridorWidth/2 + (lane - 0.5) * laneWidth
+                local glove = Instance.new("Part")
+                glove.Name = "PunchingGlove_R" .. row .. "_L" .. lane
+                glove.Size = Vector3.new(laneWidth * 0.6, 4, 4)
+                glove.Position = Vector3.new(xPos, 8, zPos)  -- 위에서 대기
+                glove.Anchored = true
+                glove.BrickColor = BrickColor.new("Bright red")
+                glove.Material = Enum.Material.SmoothPlastic
+                glove.Transparency = 0.3
+                glove.Parent = parent
+
+                local gloveGui = Instance.new("SurfaceGui")
+                gloveGui.Face = Enum.NormalId.Front
+                gloveGui.Parent = glove
+                local gloveLabel = Instance.new("TextLabel")
+                gloveLabel.Size = UDim2.new(1, 0, 1, 0)
+                gloveLabel.BackgroundTransparency = 1
+                gloveLabel.Text = "🥊"
+                gloveLabel.TextScaled = true
+                gloveLabel.Parent = gloveGui
+
+                -- 레인 바닥 경고 표시
+                local warnFloor = Instance.new("Part")
+                warnFloor.Name = "WarnFloor_R" .. row .. "_L" .. lane
+                warnFloor.Size = Vector3.new(laneWidth - 2, 0.3, 6)
+                warnFloor.Position = Vector3.new(xPos, 0.15, zPos)
+                warnFloor.Anchored = true
+                warnFloor.CanCollide = false
+                warnFloor.BrickColor = BrickColor.new("Medium stone grey")
+                warnFloor.Material = Enum.Material.SmoothPlastic
+                warnFloor.Transparency = 0.3
+                warnFloor.Parent = parent
+
+                local db = {}
+                glove.Touched:Connect(function(hit)
+                    local player = Players:GetPlayerFromCharacter(hit.Parent)
+                    local hum = hit.Parent:FindFirstChild("Humanoid")
+                    if player and hum and not db[player] then
+                        db[player] = true
+                        local newSpeed = ApplySpeedBoost(player, -5)
+                        local origJump = hum.JumpPower
+                        hum.WalkSpeed = BASE_WALK_SPEED * 0.3
+                        hum.JumpPower = 0
+                        Events.ItemEffect:FireClient(player, "SpeedDown", {
+                            speedPercent = newSpeed,
+                            message = "👊 감속! -5%",
+                            stun = true
+                        })
+                        task.delay(1.5, function()
+                            if hum then
+                                hum.WalkSpeed = BASE_WALK_SPEED * (GetSpeedBoost(player) / 100)
+                                hum.JumpPower = origJump
+                            end
+                            db[player] = nil
+                        end)
+                    end
+                end)
+
+                table.insert(rowGloves, {glove = glove, warnFloor = warnFloor, xPos = xPos, zPos = zPos})
+                table.insert(ActiveGimmicks, glove)
+                table.insert(ActiveGimmicks, warnFloor)
+            end
+
+            table.insert(gloveRows, rowGloves)
+        end
+
+        -- 패턴 기반 공격 로직 (각 열마다 1~2개 레인만 공격)
+        task.spawn(function()
+            while gloveRows[1] and gloveRows[1][1].glove.Parent do
+                for rowIdx, rowGloves in ipairs(gloveRows) do
+                    -- 랜덤하게 1~2개 레인 선택 (최소 1개는 안전)
+                    local attackLanes = {}
+                    local safeCount = math.random(1, laneCount - 1)
+                    for i = 1, laneCount do
+                        if i <= laneCount - safeCount then
+                            table.insert(attackLanes, i)
+                        end
+                    end
+                    -- 셔플
+                    for i = #attackLanes, 2, -1 do
+                        local j = math.random(1, i)
+                        attackLanes[i], attackLanes[j] = attackLanes[j], attackLanes[i]
+                    end
+
+                    -- 경고 표시 (노란색)
+                    for lane, gloveData in ipairs(rowGloves) do
+                        local isAttacking = false
+                        for _, aLane in ipairs(attackLanes) do
+                            if aLane == lane then isAttacking = true break end
+                        end
+                        if isAttacking then
+                            gloveData.warnFloor.BrickColor = BrickColor.new("Bright yellow")
+                            gloveData.glove.Transparency = 0
+                        else
+                            gloveData.warnFloor.BrickColor = BrickColor.new("Lime green")
+                            gloveData.glove.Transparency = 0.7
+                        end
+                    end
+
+                    task.wait(0.8)  -- 경고 시간
+
+                    -- 공격!
+                    for lane, gloveData in ipairs(rowGloves) do
+                        local isAttacking = false
+                        for _, aLane in ipairs(attackLanes) do
+                            if aLane == lane then isAttacking = true break end
+                        end
+                        if isAttacking then
+                            gloveData.warnFloor.BrickColor = BrickColor.new("Really red")
+                            local downPos = Vector3.new(gloveData.xPos, 3, gloveData.zPos)
+                            local upPos = Vector3.new(gloveData.xPos, 8, gloveData.zPos)
+                            TweenService:Create(gloveData.glove, TweenInfo.new(0.15, Enum.EasingStyle.Back), {Position = downPos}):Play()
+                            task.delay(0.3, function()
+                                TweenService:Create(gloveData.glove, TweenInfo.new(0.3), {Position = upPos}):Play()
+                                gloveData.warnFloor.BrickColor = BrickColor.new("Medium stone grey")
+                            end)
+                        end
+                    end
+
+                    task.wait(0.5)
+                end
+                task.wait(1.0)  -- 사이클 간 휴식
+            end
+        end)
     end
 })
 
@@ -1581,17 +1759,18 @@ GimmickRegistry:Register({
     end
 })
 
--- ⬅️ ConveyorBelt
+-- ⬅️ ConveyorBelt (스킬 업그레이드: 사이드 안전 레인)
 GimmickRegistry:Register({
     name = "ConveyorBelt",
     displayName = "컨베이어 벨트",
     icon = "⬅️",
     difficulty = "medium",
-    description = "뒤로 밀리는 바닥",
+    description = "뒤로 밀리는 바닥 - 양쪽 가장자리 안전 레인으로 통과!",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
         length = {type = "number", min = 20, max = 200, default = 60, label = "길이"},
-        direction = {type = "number", min = -1, max = 1, default = -1, label = "방향 (-1: 뒤로)"}
+        direction = {type = "number", min = -1, max = 1, default = -1, label = "방향 (-1: 뒤로)"},
+        safeLaneWidth = {type = "number", min = 2, max = 6, default = 4, label = "안전 레인 너비"}
     },
     builder = function(parent, data)
         if not Config.EnableConveyorBelt then return end
@@ -1599,15 +1778,44 @@ GimmickRegistry:Register({
         local length = data.length or 60
         local direction = data.direction or -1
         local TW = Config.TRACK_WIDTH
+        local safeLaneWidth = data.safeLaneWidth or 4
+
+        -- 중앙 컨베이어 벨트 (밀리는 구역)
+        local beltWidth = TW - 4 - (safeLaneWidth * 2)
         local belt = Instance.new("Part")
-        belt.Size = Vector3.new(TW - 4, 1, length)
+        belt.Name = "ConveyorBelt"
+        belt.Size = Vector3.new(beltWidth, 1, length)
         belt.Position = Vector3.new(0, 0.5, zStart + length/2)
         belt.Anchored = true
         belt.BrickColor = BrickColor.new("Dark stone grey")
         belt.Material = Enum.Material.DiamondPlate
         belt.Parent = parent
+
+        -- 왼쪽 안전 레인 (초록)
+        local leftLane = Instance.new("Part")
+        leftLane.Name = "SafeLane_Left"
+        leftLane.Size = Vector3.new(safeLaneWidth, 1, length)
+        leftLane.Position = Vector3.new(-(beltWidth/2 + safeLaneWidth/2), 0.5, zStart + length/2)
+        leftLane.Anchored = true
+        leftLane.BrickColor = BrickColor.new("Lime green")
+        leftLane.Material = Enum.Material.SmoothPlastic
+        leftLane.Parent = parent
+        table.insert(ActiveGimmicks, leftLane)
+
+        -- 오른쪽 안전 레인 (초록)
+        local rightLane = Instance.new("Part")
+        rightLane.Name = "SafeLane_Right"
+        rightLane.Size = Vector3.new(safeLaneWidth, 1, length)
+        rightLane.Position = Vector3.new(beltWidth/2 + safeLaneWidth/2, 0.5, zStart + length/2)
+        rightLane.Anchored = true
+        rightLane.BrickColor = BrickColor.new("Lime green")
+        rightLane.Material = Enum.Material.SmoothPlastic
+        rightLane.Parent = parent
+        table.insert(ActiveGimmicks, rightLane)
+
+        -- 경고 표지판
         local signPart = Instance.new("Part")
-        signPart.Size = Vector3.new(10, 5, 1)
+        signPart.Size = Vector3.new(14, 5, 1)
         signPart.Position = Vector3.new(0, 5, zStart - 3)
         signPart.Anchored = true
         signPart.CanCollide = false
@@ -1620,11 +1828,13 @@ GimmickRegistry:Register({
         local signLabel = Instance.new("TextLabel")
         signLabel.Size = UDim2.new(1, 0, 1, 0)
         signLabel.BackgroundTransparency = 1
-        signLabel.Text = "⬅️ CONVEYOR"
+        signLabel.Text = "⬅️ CONVEYOR\n🟢 가장자리 = 안전!"
         signLabel.TextColor3 = Color3.new(0, 0, 0)
         signLabel.TextScaled = true
         signLabel.Font = Enum.Font.GothamBold
         signLabel.Parent = signGui
+
+        -- 컨베이어 밀기 로직 (중앙 벨트만)
         local playersOnBelt = {}
         belt.Touched:Connect(function(hit)
             local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
@@ -1632,14 +1842,12 @@ GimmickRegistry:Register({
         end)
         belt.TouchEnded:Connect(function(hit) playersOnBelt[hit.Parent] = nil end)
 
-        -- 컨베이어 벨트 힘 (강화됨)
-        local beltSpeed = 0.3 * (direction or -1)  -- 더 강한 힘
+        local beltSpeed = 0.3 * (direction or -1)
         task.spawn(function()
             while belt and belt.Parent do
                 for char, _ in pairs(playersOnBelt) do
                     local rp = char:FindFirstChild("HumanoidRootPart")
                     if rp then
-                        -- AssemblyLinearVelocity로 더 자연스러운 밀기
                         local currentVel = rp.AssemblyLinearVelocity
                         rp.AssemblyLinearVelocity = Vector3.new(
                             currentVel.X,
@@ -1648,60 +1856,79 @@ GimmickRegistry:Register({
                         )
                     end
                 end
-                task.wait(0.05)  -- 약간의 딜레이로 성능 개선
+                task.wait(0.05)
             end
         end)
+
         table.insert(ActiveGimmicks, belt)
         table.insert(ActiveGimmicks, signPart)
         return belt
     end
 })
 
--- ⚡ ElectricFloor
+-- ⚡ ElectricFloor (스킬 업그레이드: 3레인 순차 감전, 안전 지대)
 GimmickRegistry:Register({
     name = "ElectricFloor",
     displayName = "전기 바닥",
     icon = "⚡",
     difficulty = "medium",
-    description = "주기적으로 감전되는 바닥",
+    description = "3레인 순차 감전 - 안전한 레인으로 이동하며 통과!",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
-        length = {type = "number", min = 20, max = 200, default = 60, label = "길이"}
+        length = {type = "number", min = 20, max = 200, default = 60, label = "길이"},
+        laneCount = {type = "number", min = 2, max = 4, default = 3, label = "레인 수"}
     },
     builder = function(parent, data)
         if not Config.EnableElectricFloor then return end
         local zStart = data.z
         local length = data.length or 60
         local TW = Config.TRACK_WIDTH
-        local floor = Instance.new("Part")
-        floor.Name = "ElectricFloor"
-        floor.Size = Vector3.new(TW - 4, 0.5, length + 20)
-        floor.Position = Vector3.new(0, 0.25, zStart + length/2)
-        floor.Anchored = true
-        floor.BrickColor = BrickColor.new("Medium stone grey")
-        floor.Material = Enum.Material.Metal
-        floor.Parent = parent
-        for i = 1, math.floor(length / 12) do
-            local boltPart = Instance.new("Part")
-            boltPart.Size = Vector3.new(5, 0.1, 5)
-            boltPart.Position = Vector3.new(math.random(-12, 12), 0.35, zStart + i * 12)
-            boltPart.Anchored = true
-            boltPart.CanCollide = false
-            boltPart.Transparency = 1
-            boltPart.Parent = parent
-            local boltGui = Instance.new("SurfaceGui")
-            boltGui.Face = Enum.NormalId.Top
-            boltGui.Parent = boltPart
-            local boltLabel = Instance.new("TextLabel")
-            boltLabel.Size = UDim2.new(1, 0, 1, 0)
-            boltLabel.BackgroundTransparency = 1
-            boltLabel.Text = "⚡"
-            boltLabel.TextScaled = true
-            boltLabel.Parent = boltGui
-            table.insert(ActiveGimmicks, boltPart)
+        local laneCount = data.laneCount or 3
+        local laneWidth = (TW - 4) / laneCount
+        local lanes = {}
+        local playersOnLane = {}
+
+        -- 레인별 바닥 생성
+        for i = 1, laneCount do
+            local xPos = -((TW - 4) / 2) + (i - 0.5) * laneWidth
+            local lane = Instance.new("Part")
+            lane.Name = "ElectricLane_" .. i
+            lane.Size = Vector3.new(laneWidth - 1, 0.5, length)
+            lane.Position = Vector3.new(xPos, 0.25, zStart + length/2)
+            lane.Anchored = true
+            lane.BrickColor = BrickColor.new("Medium stone grey")
+            lane.Material = Enum.Material.Metal
+            lane.Parent = parent
+
+            -- 레인 번호 표시
+            local laneMarker = Instance.new("Part")
+            laneMarker.Size = Vector3.new(laneWidth - 2, 0.1, 4)
+            laneMarker.Position = Vector3.new(xPos, 0.55, zStart + 5)
+            laneMarker.Anchored = true
+            laneMarker.CanCollide = false
+            laneMarker.Transparency = 0.5
+            laneMarker.BrickColor = BrickColor.new("Lime green")
+            laneMarker.Material = Enum.Material.Neon
+            laneMarker.Parent = parent
+            table.insert(ActiveGimmicks, laneMarker)
+
+            playersOnLane[i] = {}
+            lane.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                if player then playersOnLane[i][player] = true end
+            end)
+            lane.TouchEnded:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                if player then playersOnLane[i][player] = nil end
+            end)
+
+            table.insert(lanes, lane)
+            table.insert(ActiveGimmicks, lane)
         end
+
+        -- 경고 표지판
         local warnSign = Instance.new("Part")
-        warnSign.Size = Vector3.new(12, 6, 1)
+        warnSign.Size = Vector3.new(16, 6, 1)
         warnSign.Position = Vector3.new(0, 5, zStart - 5)
         warnSign.Anchored = true
         warnSign.CanCollide = false
@@ -1713,65 +1940,152 @@ GimmickRegistry:Register({
         local warnLabel = Instance.new("TextLabel")
         warnLabel.Size = UDim2.new(1, 0, 1, 0)
         warnLabel.BackgroundTransparency = 1
-        warnLabel.Text = "⚡ DANGER ⚡"
+        warnLabel.Text = "⚡ 순차 감전! ⚡\n🟢 초록 레인 = 안전"
         warnLabel.TextColor3 = Color3.new(0, 0, 0)
         warnLabel.TextScaled = true
         warnLabel.Font = Enum.Font.GothamBold
         warnLabel.Parent = warnGui
-        local playersOnFloor = {}
-        floor.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            if player then playersOnFloor[player] = true end
-        end)
-        floor.TouchEnded:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            if player then playersOnFloor[player] = nil end
-        end)
+        table.insert(ActiveGimmicks, warnSign)
+
+        -- 순차 감전 로직
         task.spawn(function()
-            while floor and floor.Parent do
-                floor.BrickColor = BrickColor.new("Bright yellow")
-                floor.Material = Enum.Material.Metal
-                task.wait(1.5)
-                floor.BrickColor = BrickColor.new("Cyan")
-                floor.Material = Enum.Material.Neon
-                for player, _ in pairs(playersOnFloor) do
-                    -- 장애물 충돌: -5% 감속 (100% 이하로는 안내려감)
-                    local newSpeed = ApplySpeedBoost(player, -5)
-                    Events.ItemEffect:FireClient(player, "SpeedDown", {
-                        speedPercent = newSpeed,
-                        message = "⚡ 감속! -5%",
-                        stun = true
-                    })
+            local currentDanger = 1
+            while lanes[1] and lanes[1].Parent do
+                -- 모든 레인 안전 상태로 (노란색 경고)
+                for i, lane in ipairs(lanes) do
+                    if i == currentDanger then
+                        lane.BrickColor = BrickColor.new("Bright yellow")  -- 다음 감전 예고
+                    else
+                        lane.BrickColor = BrickColor.new("Lime green")  -- 안전
+                    end
+                    lane.Material = Enum.Material.SmoothPlastic
                 end
-                task.wait(0.6)
-                floor.BrickColor = BrickColor.new("Medium stone grey")
-                floor.Material = Enum.Material.Metal
-                task.wait(2)
+                task.wait(1.0)  -- 예고 시간
+
+                -- 감전!
+                local dangerLane = lanes[currentDanger]
+                if dangerLane then
+                    dangerLane.BrickColor = BrickColor.new("Cyan")
+                    dangerLane.Material = Enum.Material.Neon
+
+                    -- 해당 레인에 있는 플레이어 감전
+                    for player, _ in pairs(playersOnLane[currentDanger]) do
+                        local newSpeed = ApplySpeedBoost(player, -5)
+                        Events.ItemEffect:FireClient(player, "SpeedDown", {
+                            speedPercent = newSpeed,
+                            message = "⚡ 감전! -5%",
+                            stun = true
+                        })
+                    end
+                end
+                task.wait(0.5)
+
+                -- 다음 레인으로
+                currentDanger = currentDanger + 1
+                if currentDanger > laneCount then
+                    currentDanger = 1
+                end
+                task.wait(0.5)
             end
         end)
-        table.insert(ActiveGimmicks, floor)
-        table.insert(ActiveGimmicks, warnSign)
-        return floor
+
+        return lanes[1]
     end
 })
 
--- 🪨 RollingBoulder
+-- 🪨 RollingBoulder (스킬 업그레이드: 양쪽 회피 홈 + 경고 시스템)
 GimmickRegistry:Register({
     name = "RollingBoulder",
     displayName = "굴러오는 바위",
     icon = "🪨",
     difficulty = "hard",
-    description = "뒤에서 굴러오는 바위",
+    description = "바위가 굴러오면 양쪽 홈으로 회피!",
     schema = {
         zStart = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
-        zEnd = {type = "number", min = 0, max = 2000, default = 200, label = "끝 위치 (Z)"}
+        zEnd = {type = "number", min = 0, max = 2000, default = 200, label = "끝 위치 (Z)"},
+        alcoveCount = {type = "number", min = 2, max = 6, default = 3, label = "회피 홈 개수"}
     },
     builder = function(parent, data)
         if not Config.EnableRollingBoulder then return end
         local zStart = data.zStart
         local zEnd = data.zEnd
+        local TW = Config.TRACK_WIDTH
+        local alcoveCount = data.alcoveCount or 3
+        local sectionLength = (zEnd - zStart) / alcoveCount
+
+        -- 중앙 바위길 (좁음)
+        local pathWidth = 16
+        local mainPath = Instance.new("Part")
+        mainPath.Name = "BoulderPath"
+        mainPath.Size = Vector3.new(pathWidth, 1, zEnd - zStart)
+        mainPath.Position = Vector3.new(0, 0.5, (zStart + zEnd) / 2)
+        mainPath.Anchored = true
+        mainPath.BrickColor = BrickColor.new("Dark stone grey")
+        mainPath.Material = Enum.Material.Slate
+        mainPath.Parent = parent
+        table.insert(ActiveGimmicks, mainPath)
+
+        -- 양쪽 벽 (홈 제외)
+        local wallHeight = 6
+        for _, side in ipairs({-1, 1}) do
+            local wall = Instance.new("Part")
+            wall.Size = Vector3.new(3, wallHeight, zEnd - zStart)
+            wall.Position = Vector3.new(side * (pathWidth/2 + 1.5), wallHeight/2, (zStart + zEnd) / 2)
+            wall.Anchored = true
+            wall.BrickColor = BrickColor.new("Reddish brown")
+            wall.Material = Enum.Material.Brick
+            wall.Parent = parent
+            table.insert(ActiveGimmicks, wall)
+        end
+
+        -- 회피 홈 생성 (양쪽에)
+        local alcoves = {}
+        for i = 1, alcoveCount do
+            local alcoveZ = zStart + (i - 0.5) * sectionLength
+            for _, side in ipairs({-1, 1}) do
+                local alcoveWidth = 8
+                local alcoveDepth = 10
+
+                -- 홈 바닥
+                local alcoveFloor = Instance.new("Part")
+                alcoveFloor.Name = "Alcove_" .. i .. "_" .. (side == -1 and "L" or "R")
+                alcoveFloor.Size = Vector3.new(alcoveDepth, 1, alcoveWidth)
+                alcoveFloor.Position = Vector3.new(side * (pathWidth/2 + alcoveDepth/2 + 2), 0.5, alcoveZ)
+                alcoveFloor.Anchored = true
+                alcoveFloor.BrickColor = BrickColor.new("Lime green")
+                alcoveFloor.Material = Enum.Material.Grass
+                alcoveFloor.Parent = parent
+
+                -- 홈 표시 (화살표)
+                local alcoveSign = Instance.new("Part")
+                alcoveSign.Size = Vector3.new(2, 3, 0.5)
+                alcoveSign.Position = Vector3.new(side * (pathWidth/2 + 1), 2, alcoveZ)
+                alcoveSign.Anchored = true
+                alcoveSign.CanCollide = false
+                alcoveSign.BrickColor = BrickColor.new("Lime green")
+                alcoveSign.Material = Enum.Material.Neon
+                alcoveSign.Parent = parent
+                local signGui = Instance.new("SurfaceGui")
+                signGui.Face = (side == -1) and Enum.NormalId.Right or Enum.NormalId.Left
+                signGui.Parent = alcoveSign
+                local signLabel = Instance.new("TextLabel")
+                signLabel.Size = UDim2.new(1, 0, 1, 0)
+                signLabel.BackgroundTransparency = 1
+                signLabel.Text = (side == -1) and "◀" or "▶"
+                signLabel.TextColor3 = Color3.new(1, 1, 1)
+                signLabel.TextScaled = true
+                signLabel.Font = Enum.Font.GothamBold
+                signLabel.Parent = signGui
+
+                table.insert(alcoves, {floor = alcoveFloor, sign = alcoveSign, z = alcoveZ})
+                table.insert(ActiveGimmicks, alcoveFloor)
+                table.insert(ActiveGimmicks, alcoveSign)
+            end
+        end
+
+        -- 경고 표지판
         local warnSign = Instance.new("Part")
-        warnSign.Size = Vector3.new(12, 8, 1)
+        warnSign.Size = Vector3.new(16, 8, 1)
         warnSign.Position = Vector3.new(0, 6, zStart - 15)
         warnSign.Anchored = true
         warnSign.CanCollide = false
@@ -1781,47 +2095,95 @@ GimmickRegistry:Register({
         warnGui.Face = Enum.NormalId.Front
         warnGui.Parent = warnSign
         local warnLabel = Instance.new("TextLabel")
-        warnLabel.Size = UDim2.new(1,0,1,0)
+        warnLabel.Size = UDim2.new(1, 0, 1, 0)
         warnLabel.BackgroundTransparency = 1
-        warnLabel.Text = "⚠️ BOULDER! ⚠️\n🪨 DODGE! 🪨"
-        warnLabel.TextColor3 = Color3.new(1,1,1)
+        warnLabel.Text = "🪨 BOULDER ZONE 🪨\n◀ 홈으로 회피! ▶"
+        warnLabel.TextColor3 = Color3.new(1, 1, 1)
         warnLabel.TextScaled = true
         warnLabel.Font = Enum.Font.GothamBold
         warnLabel.Parent = warnGui
+        table.insert(ActiveGimmicks, warnSign)
+
+        -- 경고 라이트 (바위 올 때 깜빡임)
+        local warnLight = Instance.new("Part")
+        warnLight.Size = Vector3.new(pathWidth, 0.3, 5)
+        warnLight.Position = Vector3.new(0, 0.65, zEnd - 5)
+        warnLight.Anchored = true
+        warnLight.CanCollide = false
+        warnLight.BrickColor = BrickColor.new("Medium stone grey")
+        warnLight.Material = Enum.Material.SmoothPlastic
+        warnLight.Transparency = 0.3
+        warnLight.Parent = parent
+        table.insert(ActiveGimmicks, warnLight)
+
+        -- 바위 스폰 로직
         task.spawn(function()
             while parent and parent.Parent do
-                task.wait(7 / Config.ObstacleSpeed)
+                -- 경고 시작 (3초 전)
+                warnLight.BrickColor = BrickColor.new("Bright yellow")
+                warnLight.Material = Enum.Material.Neon
+                for _, alcove in ipairs(alcoves) do
+                    alcove.sign.BrickColor = BrickColor.new("Bright yellow")
+                end
+                task.wait(1)
+
+                -- 위험 경고 (깜빡임)
+                for flash = 1, 4 do
+                    warnLight.BrickColor = BrickColor.new("Really red")
+                    task.wait(0.25)
+                    warnLight.BrickColor = BrickColor.new("Bright yellow")
+                    task.wait(0.25)
+                end
+
+                -- 바위 발사!
+                warnLight.BrickColor = BrickColor.new("Really red")
                 local boulder = Instance.new("Part")
-                boulder.Size = Vector3.new(10, 10, 10)
-                boulder.Position = Vector3.new(0, 6, zEnd + 5)
+                boulder.Name = "Boulder"
+                boulder.Size = Vector3.new(12, 12, 12)
+                boulder.Position = Vector3.new(0, 7, zEnd + 10)
                 boulder.Anchored = false
                 boulder.Shape = Enum.PartType.Ball
                 boulder.BrickColor = BrickColor.new("Dark stone grey")
                 boulder.Material = Enum.Material.Slate
                 boulder.Parent = parent
+
                 local bv = Instance.new("BodyVelocity")
                 bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                bv.Velocity = Vector3.new(0, 0, -45 * Config.ObstacleSpeed)
+                bv.Velocity = Vector3.new(0, 0, -40 * Config.ObstacleSpeed)
                 bv.Parent = boulder
+
                 local db = {}
                 boulder.Touched:Connect(function(hit)
                     local player = Players:GetPlayerFromCharacter(hit.Parent)
                     if player and not db[player] then
                         db[player] = true
-                        -- 장애물 충돌: -5% 감속 (100% 이하로는 안내려감)
                         local newSpeed = ApplySpeedBoost(player, -5)
                         Events.ItemEffect:FireClient(player, "SpeedDown", {
                             speedPercent = newSpeed,
-                            message = "🪨 감속! -5%",
-                            direction = Vector3.new(0, 35, -55)
+                            message = "🪨 으악! -5%",
+                            direction = Vector3.new(0, 40, -60)
                         })
                         task.delay(1, function() db[player] = nil end)
                     end
                 end)
-                task.delay(12, function() if boulder and boulder.Parent then boulder:Destroy() end end)
+
+                -- 바위가 지나간 후 안전 표시 복구
+                task.delay(3, function()
+                    warnLight.BrickColor = BrickColor.new("Medium stone grey")
+                    warnLight.Material = Enum.Material.SmoothPlastic
+                    for _, alcove in ipairs(alcoves) do
+                        alcove.sign.BrickColor = BrickColor.new("Lime green")
+                    end
+                end)
+
+                task.delay(10, function()
+                    if boulder and boulder.Parent then boulder:Destroy() end
+                end)
+
+                task.wait(6 / Config.ObstacleSpeed)
             end
         end)
-        table.insert(ActiveGimmicks, warnSign)
+
         return warnSign
     end
 })
