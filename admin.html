@@ -1417,70 +1417,93 @@
             const gimmicksContainer = document.getElementById('previewGimmicks');
             gimmicksContainer.innerHTML = '';
 
-            courseGimmicks.forEach((gimmick, index) => {
+            // Sort gimmicks by Z position for proper rendering order
+            const sortedGimmicks = courseGimmicks.map((g, i) => ({ gimmick: g, originalIndex: i }))
+                .sort((a, b) => getGimmickZ(a.gimmick) - getGimmickZ(b.gimmick));
+
+            // First pass: render zone gimmicks (lower z-index)
+            sortedGimmicks.forEach(({ gimmick, originalIndex }, sortIndex) => {
                 const def = GIMMICK_DEFS[gimmick.type];
                 if (!def) return;
+                if (gimmick.length === undefined && gimmick.zEnd === undefined) return; // Skip point gimmicks
+
+                const z = getGimmickZ(gimmick);
+                const xPos = (z + 50) * previewScale;
+                const length = gimmick.length || (gimmick.zEnd - (gimmick.zStart || 0)) || 60;
+                const zone = document.createElement('div');
+                zone.className = 'preview-zone';
+
+                if (gimmick.type === 'SlimeZone') zone.classList.add('slime');
+                else if (gimmick.type === 'ConveyorBelt') zone.classList.add('conveyor');
+                else if (gimmick.type === 'ElectricFloor') zone.classList.add('electric');
+                else if (gimmick.type === 'PunchingCorridor') zone.classList.add('punching');
+                else if (gimmick.type === 'RollingBoulder') {
+                    zone.style.background = 'linear-gradient(90deg, transparent, rgba(139,69,19,0.5), transparent)';
+                }
+                else if (gimmick.type === 'DisappearingBridge') {
+                    zone.style.background = 'rgba(100,100,100,0.5)';
+                    zone.style.borderTop = '3px dashed #fff';
+                }
+
+                zone.style.left = `${xPos}px`;
+                zone.style.width = `${length * previewScale}px`;
+                zone.style.height = '50px';
+                zone.style.zIndex = '1';
+                zone.title = `${def.displayName} (Z: ${z}, 길이: ${length})`;
+                zone.onclick = () => { closePreviewModal(); selectGimmick(originalIndex); };
+
+                const label = document.createElement('div');
+                label.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;';
+                label.textContent = def.icon;
+                zone.appendChild(label);
+
+                gimmicksContainer.appendChild(zone);
+            });
+
+            // Second pass: render point gimmicks (higher z-index, on top of zones)
+            sortedGimmicks.forEach(({ gimmick, originalIndex }, sortIndex) => {
+                const def = GIMMICK_DEFS[gimmick.type];
+                if (!def) return;
+                if (gimmick.length !== undefined || gimmick.zEnd !== undefined) return; // Skip zone gimmicks
 
                 const z = getGimmickZ(gimmick);
                 const xPos = (z + 50) * previewScale;
 
-                if (gimmick.length !== undefined || gimmick.zEnd !== undefined) {
-                    const length = gimmick.length || (gimmick.zEnd - (gimmick.zStart || 0)) || 60;
-                    const zone = document.createElement('div');
-                    zone.className = 'preview-zone';
+                const gimmickEl = document.createElement('div');
+                gimmickEl.className = 'preview-gimmick';
+                gimmickEl.style.left = `${xPos}px`;
+                gimmickEl.style.zIndex = `${10 + sortIndex}`;
 
-                    if (gimmick.type === 'SlimeZone') zone.classList.add('slime');
-                    else if (gimmick.type === 'ConveyorBelt') zone.classList.add('conveyor');
-                    else if (gimmick.type === 'ElectricFloor') zone.classList.add('electric');
-                    else if (gimmick.type === 'PunchingCorridor') zone.classList.add('punching');
-                    else if (gimmick.type === 'RollingBoulder') {
-                        zone.style.background = 'linear-gradient(90deg, transparent, rgba(139,69,19,0.5), transparent)';
-                    }
-
-                    zone.style.left = `${xPos}px`;
-                    zone.style.width = `${length * previewScale}px`;
-                    zone.style.height = '50px';
-                    zone.title = `${def.displayName} (Z: ${z}, 길이: ${length})`;
-                    zone.onclick = () => { closePreviewModal(); selectGimmick(index); };
-
-                    const label = document.createElement('div');
-                    label.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;';
-                    label.textContent = def.icon;
-                    zone.appendChild(label);
-
-                    gimmicksContainer.appendChild(zone);
-                } else {
-                    const gimmickEl = document.createElement('div');
-                    gimmickEl.className = 'preview-gimmick';
-                    gimmickEl.style.left = `${xPos}px`;
-
-                    let bottomPos = 145;
-                    if (gimmick.type === 'RotatingBar') bottomPos = 150 + (gimmick.height || 3) * 5;
-                    else if (gimmick.type === 'JumpPad') bottomPos = 140;
-                    else if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator') bottomPos = 170;
-                    gimmickEl.style.bottom = `${bottomPos}px`;
-
-                    let tooltip = `${def.displayName} (Z: ${z})`;
-                    if (gimmick.id) tooltip += ` #${gimmick.id}`;
-                    if (gimmick.options) tooltip += ` [${gimmick.options}선택지]`;
-                    gimmickEl.title = tooltip;
-
-                    gimmickEl.onclick = () => { closePreviewModal(); selectGimmick(index); };
-
-                    const icon = document.createElement('div');
-                    icon.className = 'preview-gimmick-icon';
-                    icon.textContent = def.icon;
-                    gimmickEl.appendChild(icon);
-
-                    if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator' || gimmick.type === 'PortalMaze') {
-                        const labelEl = document.createElement('div');
-                        labelEl.className = 'preview-gimmick-label';
-                        labelEl.textContent = `#${gimmick.id} (${gimmick.options}개)`;
-                        gimmickEl.appendChild(labelEl);
-                    }
-
-                    gimmicksContainer.appendChild(gimmickEl);
+                let bottomPos = 145;
+                if (gimmick.type === 'RotatingBar') {
+                    bottomPos = 150 + (gimmick.height || 3) * 5;
+                } else if (gimmick.type === 'JumpPad') {
+                    bottomPos = 140;
+                } else if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator' || gimmick.type === 'PortalMaze') {
+                    bottomPos = 170;
                 }
+                gimmickEl.style.bottom = `${bottomPos}px`;
+
+                let tooltip = `${def.displayName} (Z: ${z})`;
+                if (gimmick.id) tooltip += ` #${gimmick.id}`;
+                if (gimmick.options) tooltip += ` [${gimmick.options}선택지]`;
+                gimmickEl.title = tooltip;
+
+                gimmickEl.onclick = () => { closePreviewModal(); selectGimmick(originalIndex); };
+
+                const icon = document.createElement('div');
+                icon.className = 'preview-gimmick-icon';
+                icon.textContent = def.icon;
+                gimmickEl.appendChild(icon);
+
+                if (gimmick.type === 'QuizGate' || gimmick.type === 'Elevator' || gimmick.type === 'PortalMaze') {
+                    const labelEl = document.createElement('div');
+                    labelEl.className = 'preview-gimmick-label';
+                    labelEl.textContent = `#${gimmick.id} (${gimmick.options}개)`;
+                    gimmickEl.appendChild(labelEl);
+                }
+
+                gimmicksContainer.appendChild(gimmickEl);
             });
 
             for (let z = 0; z <= courseLength; z += 200) {
