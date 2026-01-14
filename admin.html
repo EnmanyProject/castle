@@ -922,6 +922,20 @@
 
         <!-- Center: Track View -->
         <div class="track-panel">
+            <!-- Course Loader -->
+            <div class="course-loader" style="margin-bottom: 15px; padding: 10px; background: rgba(102, 126, 234, 0.2); border-radius: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <label style="font-weight: bold;">📂 코스 불러오기:</label>
+                <select id="courseSelect" onchange="loadSelectedCourse()" style="flex: 1; min-width: 200px; padding: 8px; border-radius: 6px; background: #1a1a2e; color: white; border: 1px solid #4a4a8a;">
+                    <option value="">-- 새 코스 만들기 --</option>
+                    <optgroup label="📁 샘플 코스">
+                        <option value="courses/sample-easy.json" selected>Easy Tutorial Course (쉬움)</option>
+                        <option value="courses/skill-test.json">Skill Gimmick Test Course (보통)</option>
+                    </optgroup>
+                </select>
+                <button class="btn btn-primary" onclick="loadFromFile()" style="white-space: nowrap;">📁 파일에서 불러오기</button>
+                <button class="btn btn-success" onclick="saveCourseToFile()" style="white-space: nowrap;">💾 파일로 저장</button>
+            </div>
+
             <div class="course-meta">
                 <div class="meta-field">
                     <label>코스 ID</label>
@@ -2112,24 +2126,12 @@
                 reader.onload = (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        if (data.metadata) {
-                            document.getElementById('courseId').value = data.metadata.id || '';
-                            document.getElementById('courseName').value = data.metadata.name || '';
-                            document.getElementById('courseAuthor').value = data.metadata.author || '';
-                            document.getElementById('courseDifficulty').value = data.metadata.difficulty || 'medium';
-                            document.getElementById('courseDescription').value = data.metadata.description || '';
-                            document.getElementById('courseLength').value = data.metadata.length || 1500;
-                        }
-                        if (data.gimmicks) {
-                            courseGimmicks = data.gimmicks;
-                        }
-                        if (data.quizPool) {
-                            quizPool = data.quizPool;
-                        }
-                        renderTrack();
-                        alert('불러오기 완료!');
+                        loadCourseData(data);
+                        // Update dropdown to "new course" since it's a custom file
+                        document.getElementById('courseSelect').value = '';
+                        alert('✅ 불러오기 완료!');
                     } catch (err) {
-                        alert('파일 형식이 올바르지 않습니다.');
+                        alert('파일 형식이 올바르지 않습니다: ' + err.message);
                     }
                 };
                 reader.readAsText(file);
@@ -2551,9 +2553,102 @@
             }
         }
 
+        // ==================== Course Load/Save ====================
+        async function loadSelectedCourse() {
+            const select = document.getElementById('courseSelect');
+            const url = select.value;
+
+            if (!url) {
+                // New course
+                clearCourse();
+                document.getElementById('courseId').value = 'my-course';
+                document.getElementById('courseName').value = 'My Custom Course';
+                document.getElementById('courseAuthor').value = 'Creator';
+                document.getElementById('courseDifficulty').value = 'medium';
+                document.getElementById('courseDescription').value = '';
+                document.getElementById('courseLength').value = '1500';
+                return;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Failed to load course');
+                const data = await response.json();
+                loadCourseData(data);
+            } catch (err) {
+                alert('코스를 불러오는데 실패했습니다: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function loadCourseData(data) {
+            if (data.metadata) {
+                document.getElementById('courseId').value = data.metadata.id || '';
+                document.getElementById('courseName').value = data.metadata.name || '';
+                document.getElementById('courseAuthor').value = data.metadata.author || '';
+                document.getElementById('courseDifficulty').value = data.metadata.difficulty || 'medium';
+                document.getElementById('courseDescription').value = data.metadata.description || '';
+                document.getElementById('courseLength').value = data.metadata.length || 1500;
+            }
+            if (data.gimmicks) {
+                courseGimmicks = data.gimmicks;
+            }
+            if (data.quizPool) {
+                quizPool = data.quizPool;
+                renderQuizList();
+                updateQuizPreview();
+            }
+            selectedGimmickIndex = -1;
+            renderTrack();
+            renderProperties();
+            updateStats();
+        }
+
+        function saveCourseToFile() {
+            const course = {
+                metadata: {
+                    id: document.getElementById('courseId').value || 'custom-course',
+                    name: document.getElementById('courseName').value || 'Custom Course',
+                    author: document.getElementById('courseAuthor').value || 'Anonymous',
+                    version: '1.0',
+                    length: parseInt(document.getElementById('courseLength').value) || 1500,
+                    difficulty: document.getElementById('courseDifficulty').value || 'medium',
+                    description: document.getElementById('courseDescription').value || ''
+                },
+                gimmicks: courseGimmicks,
+                quizPool: quizPool.length > 0 ? quizPool : undefined
+            };
+
+            const json = JSON.stringify(course, null, 4);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = (course.metadata.id || 'course') + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`✅ ${a.download} 파일이 다운로드되었습니다!`);
+        }
+
+        // Load default course on page load
+        async function initializeWithDefaultCourse() {
+            // Small delay to ensure DOM is ready
+            setTimeout(async () => {
+                const select = document.getElementById('courseSelect');
+                if (select && select.value) {
+                    await loadSelectedCourse();
+                }
+            }, 100);
+        }
+
         // ==================== Initialize ====================
         renderTrack();
         renderOptions(['', ''], 1);
+        initializeWithDefaultCourse();
     </script>
 </body>
 </html>
