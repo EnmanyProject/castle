@@ -1662,12 +1662,7 @@
             lane.style.height = `${length / 2}px`;
             lane.innerHTML = '';
 
-            courseGimmicks.sort((a, b) => {
-                const zA = a.z || a.triggerZ || a.zStart || 0;
-                const zB = b.z || b.triggerZ || b.zStart || 0;
-                return zA - zB;
-            });
-
+            // Don't sort the original array - use absolute positioning instead
             courseGimmicks.forEach((gimmick, index) => {
                 const z = gimmick.z || gimmick.triggerZ || gimmick.zStart || 0;
                 const def = GIMMICK_DEFS[gimmick.type];
@@ -1676,6 +1671,7 @@
                 const el = document.createElement('div');
                 el.className = 'placed-gimmick' + (selectedGimmick === index ? ' selected' : '');
                 el.style.top = `${z / 2}px`;
+                el.style.zIndex = `${100 + index}`; // Ensure later items appear on top
                 el.innerHTML = `${def.icon} ${def.displayName} (z=${z})`;
                 el.onclick = () => selectGimmick(index);
                 lane.appendChild(el);
