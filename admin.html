@@ -208,26 +208,104 @@
         }
 
         .track-lane {
-            position: relative;
-            width: 100%;
-            min-height: 100%;
+            padding: 10px;
+        }
+
+        .track-header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .track-empty {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+        .track-empty-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
         }
 
         .placed-gimmick {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.15);
             border-radius: 8px;
-            padding: 8px 15px;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
             cursor: pointer;
             transition: all 0.2s;
-            white-space: nowrap;
-            z-index: 10;
+            border-left: 4px solid transparent;
         }
 
-        .placed-gimmick:hover { background: rgba(255, 255, 255, 0.3); }
-        .placed-gimmick.selected { border: 2px solid #ffd700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        .placed-gimmick:hover { background: rgba(255, 255, 255, 0.25); }
+        .placed-gimmick.selected {
+            border-left-color: #ffd700;
+            background: rgba(255, 215, 0, 0.15);
+        }
+
+        .placed-gimmick.easy { border-left-color: #38ef7d; }
+        .placed-gimmick.medium { border-left-color: #feca57; }
+        .placed-gimmick.hard { border-left-color: #ff6b6b; }
+
+        .gimmick-block-icon {
+            font-size: 1.3rem;
+            width: 35px;
+            text-align: center;
+        }
+
+        .gimmick-block-info {
+            flex: 1;
+        }
+
+        .gimmick-block-name {
+            font-weight: 600;
+        }
+
+        .gimmick-block-params {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 3px;
+        }
+
+        .gimmick-block-z {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+
+        .gimmick-block-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .gimmick-block-actions button {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .gimmick-block-actions button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .gimmick-block-actions .delete-btn:hover {
+            background: rgba(255, 107, 107, 0.5);
+        }
 
         .properties-panel {
             background: rgba(0, 0, 0, 0.2);
@@ -1659,25 +1737,100 @@
         function renderTrack() {
             const lane = document.getElementById('track-lane');
             const length = parseInt(document.getElementById('courseLength').value) || 1500;
-            lane.style.height = `${length / 2}px`;
-            lane.innerHTML = '';
 
-            // Don't sort the original array - use absolute positioning instead
-            courseGimmicks.forEach((gimmick, index) => {
+            if (courseGimmicks.length === 0) {
+                lane.innerHTML = `
+                    <div class="track-header">🏁 START (Z: 0) → FINISH (Z: ${length}) 🎯</div>
+                    <div class="track-empty">
+                        <div class="track-empty-icon">📦</div>
+                        <div>왼쪽에서 기믹을 드래그하여 추가하세요</div>
+                    </div>
+                `;
+                updateStats();
+                return;
+            }
+
+            // Sort by Z for display (create sorted copy, don't modify original)
+            const sortedIndices = courseGimmicks.map((g, i) => i)
+                .sort((a, b) => {
+                    const zA = courseGimmicks[a].z || courseGimmicks[a].triggerZ || courseGimmicks[a].zStart || 0;
+                    const zB = courseGimmicks[b].z || courseGimmicks[b].triggerZ || courseGimmicks[b].zStart || 0;
+                    return zA - zB;
+                });
+
+            let html = `<div class="track-header">🏁 START (Z: 0) → FINISH (Z: ${length}) 🎯</div>`;
+
+            sortedIndices.forEach(index => {
+                const gimmick = courseGimmicks[index];
                 const z = gimmick.z || gimmick.triggerZ || gimmick.zStart || 0;
                 const def = GIMMICK_DEFS[gimmick.type];
                 if (!def) return;
 
-                const el = document.createElement('div');
-                el.className = 'placed-gimmick' + (selectedGimmick === index ? ' selected' : '');
-                el.style.top = `${z / 2}px`;
-                el.style.zIndex = `${100 + index}`; // Ensure later items appear on top
-                el.innerHTML = `${def.icon} ${def.displayName} (z=${z})`;
-                el.onclick = () => selectGimmick(index);
-                lane.appendChild(el);
+                const params = Object.entries(gimmick)
+                    .filter(([k, v]) => k !== 'type')
+                    .map(([k, v]) => `${k}:${v}`)
+                    .join(' | ');
+
+                const isSelected = selectedGimmick === index;
+                const exceeds = z > length || (gimmick.zEnd && gimmick.zEnd > length) ||
+                               (gimmick.gateZ && gimmick.gateZ > length);
+                const exceedStyle = exceeds ? 'background: rgba(255, 0, 0, 0.2); border-left-color: #ff0000 !important;' : '';
+                const exceedIcon = exceeds ? '⚠️ ' : '';
+
+                html += `
+                    <div class="placed-gimmick ${def.difficulty} ${isSelected ? 'selected' : ''}"
+                         style="${exceedStyle}"
+                         onclick="selectGimmick(${index})">
+                        <div class="gimmick-block-icon">${exceedIcon}${def.icon}</div>
+                        <div class="gimmick-block-info">
+                            <div class="gimmick-block-name">${def.displayName}${exceeds ? ' (범위 초과!)' : ''}</div>
+                            <div class="gimmick-block-params">${params}</div>
+                        </div>
+                        <div class="gimmick-block-z" style="${exceeds ? 'color: #ff4444; font-weight: bold;' : ''}">Z: ${z}</div>
+                        <div class="gimmick-block-actions">
+                            <button onclick="moveGimmickZ(${index}, -10); event.stopPropagation();" title="Z-10">▲</button>
+                            <button onclick="moveGimmickZ(${index}, 10); event.stopPropagation();" title="Z+10">▼</button>
+                            <button class="delete-btn" onclick="deleteGimmickAt(${index}); event.stopPropagation();" title="삭제">🗑</button>
+                        </div>
+                    </div>
+                `;
             });
 
+            lane.innerHTML = html;
             updateStats();
+        }
+
+        function moveGimmickZ(index, delta) {
+            const gimmick = courseGimmicks[index];
+            if (!gimmick) return;
+
+            // Find the Z property
+            if (gimmick.z !== undefined) {
+                gimmick.z = Math.max(0, gimmick.z + delta);
+            } else if (gimmick.triggerZ !== undefined) {
+                gimmick.triggerZ = Math.max(0, gimmick.triggerZ + delta);
+                if (gimmick.gateZ !== undefined) gimmick.gateZ = Math.max(0, gimmick.gateZ + delta);
+                if (gimmick.elevZ !== undefined) gimmick.elevZ = Math.max(0, gimmick.elevZ + delta);
+                if (gimmick.portalZ !== undefined) gimmick.portalZ = Math.max(0, gimmick.portalZ + delta);
+                if (gimmick.exitZ !== undefined) gimmick.exitZ = Math.max(0, gimmick.exitZ + delta);
+            } else if (gimmick.zStart !== undefined) {
+                gimmick.zStart = Math.max(0, gimmick.zStart + delta);
+                if (gimmick.zEnd !== undefined) gimmick.zEnd = Math.max(0, gimmick.zEnd + delta);
+            }
+
+            renderTrack();
+            if (selectedGimmick === index) renderProperties();
+        }
+
+        function deleteGimmickAt(index) {
+            courseGimmicks.splice(index, 1);
+            if (selectedGimmick === index) {
+                selectedGimmick = null;
+            } else if (selectedGimmick > index) {
+                selectedGimmick--;
+            }
+            renderTrack();
+            renderProperties();
         }
 
         function selectGimmick(index) {
