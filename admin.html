@@ -1729,8 +1729,13 @@
                 courseGimmicks = [];
                 selectedGimmick = null;
                 gimmickIdCounter = { QuizGate: 0, Elevator: 0, PortalMaze: 0 };
+                quizPool = [];
+                document.getElementById('courseSelect').value = '';
                 renderTrack();
                 renderProperties();
+                updateStats();
+                renderQuizList();
+                updateQuizPreview();
             }
         }
 
@@ -2559,14 +2564,22 @@
             const url = select.value;
 
             if (!url) {
-                // New course
-                clearCourse();
+                // New course - reset without confirm dialog
+                courseGimmicks = [];
+                selectedGimmick = null;
+                gimmickIdCounter = { QuizGate: 0, Elevator: 0, PortalMaze: 0 };
+                quizPool = [];
                 document.getElementById('courseId').value = 'my-course';
                 document.getElementById('courseName').value = 'My Custom Course';
                 document.getElementById('courseAuthor').value = 'Creator';
                 document.getElementById('courseDifficulty').value = 'medium';
                 document.getElementById('courseDescription').value = '';
                 document.getElementById('courseLength').value = '1500';
+                renderTrack();
+                renderProperties();
+                updateStats();
+                renderQuizList();
+                updateQuizPreview();
                 return;
             }
 
@@ -2598,7 +2611,7 @@
                 renderQuizList();
                 updateQuizPreview();
             }
-            selectedGimmickIndex = -1;
+            selectedGimmick = null;
             renderTrack();
             renderProperties();
             updateStats();
