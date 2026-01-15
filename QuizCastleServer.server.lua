@@ -2445,8 +2445,8 @@ Players.PlayerAdded:Connect(function(player)
     
     player.CharacterAdded:Connect(function(char)
         task.wait(0.5)
-        
-        if GameState.phase == "Waiting" or GameState.phase == "Ended" then
+
+        if GameState.phase == "Waiting" or GameState.phase == "Countdown" or GameState.phase == "Ended" then
             TeleportToLobby(player)
         end
         
