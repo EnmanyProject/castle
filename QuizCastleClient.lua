@@ -402,11 +402,11 @@ progressIcon.Text = "🏃"
 progressIcon.TextSize = 16
 progressIcon.Parent = progressContainer
 
--- Item Slot (진행도 아래 중앙) - 투명 배경
+-- Item Slot (왼쪽 하단) - 투명 배경
 local itemSlot = Instance.new("Frame")
 itemSlot.Name = "ItemSlot"
 itemSlot.Size = UDim2.new(0, 70, 0, 70)
-itemSlot.Position = UDim2.new(0.5, -35, 0, 95)  -- 진행도 아래 중앙
+itemSlot.Position = UDim2.new(0, 15, 1, -90)  -- 왼쪽 하단
 itemSlot.BackgroundTransparency = 1
 itemSlot.BorderSizePixel = 0
 itemSlot.Visible = false  -- 레이스 시작 전까지 숨김
@@ -701,6 +701,7 @@ local function ShowBanner(text, duration, color)
 
     bannerText.Text = text
     bannerText.TextColor3 = color or Color3.new(1, 1, 1)
+    titleBanner.Visible = true
 
     local showTween = TweenService:Create(titleBanner, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -250, 0, 20)
@@ -714,7 +715,9 @@ local function ShowBanner(text, duration, color)
         currentBannerTween = hideTween
         hideTween:Play()
         hideTween.Completed:Connect(function()
-            bannerText.Text = ""  -- 텍스트 지우기
+            bannerText.Text = ""
+            titleBanner.Visible = false  -- 완전히 숨기기
+            titleBanner.Position = UDim2.new(0.5, -250, 0, -100)  -- 위치 초기화
         end)
     end)
 end
