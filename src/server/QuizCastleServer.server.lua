@@ -30,46 +30,6 @@ end
 
 print("🏰 Quiz Castle v3.2 Loading...")
 
--- ============================================
--- 🗑️ Roblox 기본 SpawnLocation 즉시 삭제!
--- ============================================
-local Workspace = game:GetService("Workspace")
-
--- 기존 SpawnLocation 모두 제거 (우리가 만드는 것 제외)
-for _, obj in ipairs(Workspace:GetDescendants()) do
-    if obj:IsA("SpawnLocation") then
-        print("🗑️ Removing default SpawnLocation:", obj.Name, "at", obj.Position)
-        obj:Destroy()
-    end
-end
-
--- 새로 생기는 SpawnLocation 감시 및 제거 (LobbySpawn 제외)
-Workspace.DescendantAdded:Connect(function(obj)
-    if obj:IsA("SpawnLocation") and obj.Name ~= "LobbySpawn" then
-        task.defer(function()
-            if obj and obj.Parent then
-                print("🗑️ Auto-removing SpawnLocation:", obj.Name)
-                obj:Destroy()
-            end
-        end)
-    end
-end)
-
--- ============================================
--- 🎯 스폰 시스템 (근본적 재설계)
--- ============================================
--- 🗺️ 맵 레이아웃 (재설계 v2)
--- 로비(스폰) → 출발게이트 → 레이스코스
--- ============================================
-
--- 레이아웃 상수
-local LOBBY_Z = -30         -- 로비/스폰 중심
-local GATE_Z = 25           -- 출발 게이트 위치
-local COURSE_START_Z = 30   -- 코스 시작 Z 위치
-local COURSE_OFFSET = 30    -- 기믹 Z 좌표에 더해질 오프셋
-
-print("✅ Layout: Lobby(Z=-30) → Gate(Z=25) → Course(Z=30+)")
-
 local BestTimeStore, LeaderboardStore, WinsStore, XPStore
 pcall(function()
     BestTimeStore = DataStoreService:GetDataStore("QuizCastleV3_BestTimes")
@@ -392,7 +352,6 @@ local Config = {
     EnableConveyorBelt = true,
     EnableElectricFloor = true,
     EnableRollingBoulder = true,
-    EnablePortalMaze = true,
     EnableSequencePuzzle = false,
     
     ObstacleSpeed = 1.0,
@@ -408,68 +367,12 @@ local GameState = {
     finishedPlayers = {},
     countdown = 0,
     raceStartTime = 0,
-    sessionLocked = false,  -- 5초 후 새 입장 차단
 }
 
 local PlayerData = {}
 local PlayerGateAnswers = {}
 local ActiveGimmicks = {}
 local PlayerStreaks = {}
-
--- ============================================
--- 🚀 RACE SPEED BOOST SYSTEM
--- ============================================
-local PlayerSpeedBoost = {}  -- 플레이어별 속도 배율 (100 = 기본, 110 = +10%, etc.)
-local BASE_WALK_SPEED = 16   -- Roblox 기본 WalkSpeed
-
--- 속도 배율 적용 함수
-local function ApplySpeedBoost(player, deltaPercent)
-    if not PlayerSpeedBoost[player] then
-        PlayerSpeedBoost[player] = 100
-    end
-
-    local newBoost = PlayerSpeedBoost[player] + deltaPercent
-
-    -- 100% 이하로 내려가지 않음
-    if newBoost < 100 then
-        newBoost = 100
-    end
-
-    -- 최대 200%까지
-    if newBoost > 200 then
-        newBoost = 200
-    end
-
-    PlayerSpeedBoost[player] = newBoost
-
-    -- 실제 WalkSpeed 적용
-    local char = player.Character
-    if char then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then
-            hum.WalkSpeed = BASE_WALK_SPEED * (newBoost / 100)
-        end
-    end
-
-    return newBoost
-end
-
--- 속도 배율 리셋 함수
-local function ResetSpeedBoost(player)
-    PlayerSpeedBoost[player] = 100
-    local char = player.Character
-    if char then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then
-            hum.WalkSpeed = BASE_WALK_SPEED
-        end
-    end
-end
-
--- 현재 속도 배율 가져오기
-local function GetSpeedBoost(player)
-    return PlayerSpeedBoost[player] or 100
-end
 
 -- ============================================
 -- 🔄 PERFORMANCE: 중앙 집중식 회전 오브젝트 관리
@@ -714,44 +617,10 @@ local GateQuizzes = {
     {q = "Biggest planet?", o = {"Earth", "Mars", "Jupiter", "Venus"}, a = 3},
 }
 
--- 코스별 퀴즈 풀 또는 기본 퀴즈 풀에서 랜덤 선택
 local function GetQuizByOptionCount(count)
-    local pool = GateQuizzes  -- 기본 풀
-
-    -- 현재 코스에 quizPool이 있으면 해당 풀 사용
-    local currentCourse = CourseManager.currentCourse
-    if currentCourse and currentCourse.quizPool and #currentCourse.quizPool > 0 then
-        pool = currentCourse.quizPool
-    end
-
-    -- 옵션 수에 맞는 퀴즈 필터링
-    local filtered = {}
-    for _, q in ipairs(pool) do
-        if #q.o == count then
-            table.insert(filtered, q)
-        end
-    end
-
-    -- 코스 풀에서 찾았으면 반환
-    if #filtered > 0 then
-        return filtered[math.random(#filtered)]
-    end
-
-    -- 코스 풀에 해당 옵션 수 퀴즈가 없으면 기본 풀에서 찾기 (Fallback)
-    if pool ~= GateQuizzes then
-        local defaultFiltered = {}
-        for _, q in ipairs(GateQuizzes) do
-            if #q.o == count then
-                table.insert(defaultFiltered, q)
-            end
-        end
-        if #defaultFiltered > 0 then
-            return defaultFiltered[math.random(#defaultFiltered)]
-        end
-    end
-
-    -- 최후 fallback
-    return GateQuizzes[1]
+    local f = {}
+    for _, q in ipairs(GateQuizzes) do if #q.o == count then table.insert(f, q) end end
+    return #f > 0 and f[math.random(#f)] or GateQuizzes[1]
 end
 
 local gateColors = {
@@ -771,166 +640,70 @@ GimmickRegistry:Register({
     displayName = "회전 막대",
     icon = "🔄",
     difficulty = "easy",
-    description = "회전하는 막대 - 틈새로 통과하거나 점프/숙여서 피하기",
+    description = "회전하는 막대, 맞으면 튕겨남",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "위치 (Z)"},
         width = {type = "number", min = 10, max = 50, default = 28, label = "너비"},
         height = {type = "number", min = 1, max = 10, default = 3, label = "높이"},
-        speed = {type = "number", min = 0.5, max = 5, default = 1.5, label = "회전 속도"},
-        gapSize = {type = "number", min = 0, max = 10, default = 6, label = "틈새 크기 (0=없음)"},
-        barType = {type = "string", default = "normal", label = "타입 (normal/low/high)"}
+        speed = {type = "number", min = 0.5, max = 5, default = 1.5, label = "회전 속도"}
     },
     builder = function(parent, data)
         if not Config.EnableRotatingBars then return end
-
-        local totalWidth = data.width or 28
-        local gapSize = data.gapSize or 6
-        local barHeight = data.height or 3
-        local barType = data.barType or "normal"
+        local bar = Instance.new("Part")
+        bar.Size = Vector3.new(data.width or 25, 2, 2)
+        bar.Position = Vector3.new(0, data.height or 3, data.z)
+        bar.Anchored = true
+        bar.BrickColor = BrickColor.new("Bright red")
+        bar.Material = Enum.Material.Metal
+        bar.Parent = parent
         local actualSpeed = (data.speed or 2) * Config.ObstacleSpeed
-
-        -- 바 타입에 따른 높이 조정 (스킬 요소)
-        -- low: 점프로 넘기 (높이 1.5)
-        -- high: 숙여서 통과 (높이 5)
-        -- normal: 기본 (높이 3)
-        if barType == "low" then
-            barHeight = 1.5
-        elseif barType == "high" then
-            barHeight = 5
-        end
-
-        local bars = {}
+        table.insert(RotatingObjects, {
+            part = bar,
+            speed = actualSpeed,
+            rotation = math.random(0, 360),
+            rotationType = "Y"
+        })
         local db = {}
-
-        local function setupBarTouch(bar)
-            bar.Touched:Connect(function(hit)
-                local player = Players:GetPlayerFromCharacter(hit.Parent)
-                if player and not db[player] then
-                    db[player] = true
-                    local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-                    if rp then
-                        local newSpeed = ApplySpeedBoost(player, -5)
-                        Events.ItemEffect:FireClient(player, "SpeedDown", {
-                            speedPercent = newSpeed,
-                            message = "💥 감속! -5%",
-                            direction = (rp.Position - bar.Position).Unit * 35 + Vector3.new(0, 18, 0)
-                        })
-                    end
-                    task.delay(0.5, function() db[player] = nil end)
+        bar.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player and not db[player] then
+                db[player] = true
+                local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
+                if rp then
+                    Events.ItemEffect:FireClient(player, "Knockback", {direction = (rp.Position - bar.Position).Unit * 35 + Vector3.new(0, 18, 0)})
                 end
-            end)
-        end
-
-        -- 틈새가 있으면 두 개로 분리, 없으면 하나
-        if gapSize > 0 then
-            local sideWidth = (totalWidth - gapSize) / 2
-
-            -- 왼쪽 바
-            local barLeft = Instance.new("Part")
-            barLeft.Size = Vector3.new(sideWidth, 2, 2)
-            barLeft.Position = Vector3.new(-(sideWidth/2 + gapSize/2), barHeight, data.z)
-            barLeft.Anchored = true
-            barLeft.BrickColor = BrickColor.new("Bright red")
-            barLeft.Material = Enum.Material.Metal
-            barLeft.Parent = parent
-            setupBarTouch(barLeft)
-            table.insert(bars, barLeft)
-            table.insert(ActiveGimmicks, barLeft)
-
-            -- 오른쪽 바
-            local barRight = Instance.new("Part")
-            barRight.Size = Vector3.new(sideWidth, 2, 2)
-            barRight.Position = Vector3.new(sideWidth/2 + gapSize/2, barHeight, data.z)
-            barRight.Anchored = true
-            barRight.BrickColor = BrickColor.new("Bright red")
-            barRight.Material = Enum.Material.Metal
-            barRight.Parent = parent
-            setupBarTouch(barRight)
-            table.insert(bars, barRight)
-            table.insert(ActiveGimmicks, barRight)
-
-            -- 틈새 표시 (초록색 바닥 가이드)
-            local gapGuide = Instance.new("Part")
-            gapGuide.Size = Vector3.new(gapSize, 0.2, 4)
-            gapGuide.Position = Vector3.new(0, 0.1, data.z)
-            gapGuide.Anchored = true
-            gapGuide.CanCollide = false
-            gapGuide.BrickColor = BrickColor.new("Lime green")
-            gapGuide.Material = Enum.Material.Neon
-            gapGuide.Transparency = 0.5
-            gapGuide.Parent = parent
-            table.insert(ActiveGimmicks, gapGuide)
-
-            -- 회전 (두 바를 함께 회전시키는 피벗)
-            local pivotRotation = math.random(0, 360)
-            local leftOffset = -(sideWidth/2 + gapSize/2)
-            local rightOffset = sideWidth/2 + gapSize/2
-            table.insert(RotatingObjects, {
-                parts = bars,
-                offsets = {leftOffset, rightOffset},  -- 초기 오프셋 저장
-                pivotZ = data.z,
-                pivotY = barHeight,
-                speed = actualSpeed,
-                rotation = pivotRotation,
-                rotationType = "pivot"
-            })
-        else
-            -- 틈새 없는 기본 바
-            local bar = Instance.new("Part")
-            bar.Size = Vector3.new(totalWidth, 2, 2)
-            bar.Position = Vector3.new(0, barHeight, data.z)
-            bar.Anchored = true
-            bar.BrickColor = BrickColor.new("Bright red")
-            bar.Material = Enum.Material.Metal
-            bar.Parent = parent
-            setupBarTouch(bar)
-            table.insert(ActiveGimmicks, bar)
-
-            table.insert(RotatingObjects, {
-                part = bar,
-                speed = actualSpeed,
-                rotation = math.random(0, 360),
-                rotationType = "Y"
-            })
-        end
-
-        return bars[1]
+                task.delay(0.5, function() db[player] = nil end)
+            end
+        end)
+        table.insert(ActiveGimmicks, bar)
+        return bar
     end
 })
 
--- 🔺 JumpPad (업그레이드: 좌우 이동 + 하이점프 보상)
+-- 🔺 JumpPad
 GimmickRegistry:Register({
     name = "JumpPad",
     displayName = "점프 패드",
     icon = "🔺",
     difficulty = "easy",
-    description = "밟으면 점프, 아이템 타이밍 맞추면 하이점프 + 보상!",
+    description = "밟으면 높이 점프",
     schema = {
         x = {type = "number", min = -20, max = 20, default = 0, label = "X 위치"},
         y = {type = "number", min = 0, max = 10, default = 0.5, label = "Y 위치"},
-        z = {type = "number", min = 0, max = 2000, default = 100, label = "Z 위치"},
-        moveRange = {type = "number", min = 0, max = 15, default = 10, label = "이동 범위"},
-        moveSpeed = {type = "number", min = 0.5, max = 3, default = 1.5, label = "이동 속도"}
+        z = {type = "number", min = 0, max = 2000, default = 100, label = "Z 위치"}
     },
     builder = function(parent, data)
         if not Config.EnableJumpPads then return end
         local TW = Config.TRACK_WIDTH
-        local baseX = data.x or 0
-        local baseY = data.y or 0.5
-        local baseZ = data.z
-        local moveRange = data.moveRange or 10
-        local moveSpeed = data.moveSpeed or 1.5
-
-        -- 점프 패드 생성
+        local pos = Vector3.new(data.x or 0, data.y or 0.5, data.z)
         local pad = Instance.new("Part")
         pad.Name = "JumpPad"
         pad.Size = Vector3.new(8, 1, 8)
-        pad.Position = Vector3.new(baseX, baseY, baseZ)
+        pad.Position = pos
         pad.Anchored = true
         pad.BrickColor = BrickColor.new("Lime green")
         pad.Material = Enum.Material.Neon
         pad.Parent = parent
-
         local springGui = Instance.new("SurfaceGui")
         springGui.Face = Enum.NormalId.Top
         springGui.Parent = pad
@@ -942,17 +715,14 @@ GimmickRegistry:Register({
         springLabel.TextScaled = true
         springLabel.Font = Enum.Font.GothamBold
         springLabel.Parent = springGui
-
-        -- 벽 장애물
         local wall = Instance.new("Part")
         wall.Name = "JumpWall"
         wall.Size = Vector3.new(TW, 12, 3)
-        wall.Position = Vector3.new(0, 6, baseZ + 6)
+        wall.Position = Vector3.new(0, 6, pos.Z + 6)
         wall.Anchored = true
         wall.BrickColor = BrickColor.new("Medium stone grey")
         wall.Material = Enum.Material.Brick
         wall.Parent = parent
-
         local wallGui = Instance.new("SurfaceGui")
         wallGui.Face = Enum.NormalId.Back
         wallGui.Parent = wall
@@ -964,155 +734,22 @@ GimmickRegistry:Register({
         wallLabel.TextScaled = true
         wallLabel.Font = Enum.Font.GothamBold
         wallLabel.Parent = wallGui
-
-        -- 🌟 하이점프 보상 (높은 곳에 아이템 박스)
-        local rewardHeight = 15  -- 도달 가능한 높이
-        local rewardBox = Instance.new("Part")
-        rewardBox.Name = "HighJumpReward"
-        rewardBox.Size = Vector3.new(8, 8, 8)  -- 더 큰 크기
-        rewardBox.Position = Vector3.new(baseX, baseY + rewardHeight, baseZ)
-        rewardBox.Anchored = true
-        rewardBox.CanCollide = false
-        rewardBox.BrickColor = BrickColor.new("Bright yellow")
-        rewardBox.Material = Enum.Material.Neon
-        rewardBox.Transparency = 0.3
-        rewardBox.Parent = parent
-
-        local rewardGui = Instance.new("SurfaceGui")
-        rewardGui.Face = Enum.NormalId.Front
-        rewardGui.Parent = rewardBox
-        local rewardLabel = Instance.new("TextLabel")
-        rewardLabel.Size = UDim2.new(1, 0, 1, 0)
-        rewardLabel.BackgroundTransparency = 1
-        rewardLabel.Text = "⭐"
-        rewardLabel.TextColor3 = Color3.new(1, 1, 1)
-        rewardLabel.TextScaled = true
-        rewardLabel.Font = Enum.Font.GothamBold
-        rewardLabel.Parent = rewardGui
-
-        -- 점프 처리
         local db = {}
-        local rewardDb = {}
-
-        -- 🔄 통합 애니메이션 (이동 + 회전 + 보상 체크)
-        task.spawn(function()
-            local direction = 1
-            local currentX = baseX
-            local rotation = 0
-            local checkInterval = 0
-
-            while pad and pad.Parent and rewardBox and rewardBox.Parent do
-                rotation = rotation + 3
-                checkInterval = checkInterval + 1
-
-                -- 좌우 이동
-                if moveRange > 0 then
-                    currentX = currentX + (direction * moveSpeed * 0.1)
-                    if currentX > baseX + moveRange then
-                        currentX = baseX + moveRange
-                        direction = -1
-                    elseif currentX < baseX - moveRange then
-                        currentX = baseX - moveRange
-                        direction = 1
-                    end
-                    pad.Position = Vector3.new(currentX, baseY, baseZ)
-                end
-
-                -- 보상 박스: 이동 + 회전 동시 적용
-                local boxPos = Vector3.new(currentX, baseY + rewardHeight, baseZ)
-                rewardBox.CFrame = CFrame.new(boxPos) * CFrame.Angles(0, math.rad(rotation), 0)
-
-                -- 🌟 거리 기반 보상 체크 (CFrame 이동시 Touched 불안정하므로)
-                if checkInterval % 3 == 0 then  -- 매 3프레임마다 체크
-                    for _, player in ipairs(Players:GetPlayers()) do
-                        if not rewardDb[player] and player.Character then
-                            local rp = player.Character:FindFirstChild("HumanoidRootPart")
-                            if rp then
-                                local dist = (rp.Position - boxPos).Magnitude
-                                if dist < 6 then  -- 보상 박스 근처 (반경 6)
-                                    rewardDb[player] = true
-                                    print("⭐ High Jump Reward touched by:", player.Name)
-
-                                    local pData = PlayerData[player]
-                                    if pData then
-                                        local bonusXP = 50
-                                        pData.xp = (pData.xp or 0) + bonusXP
-                                        local level = pData.level or 1
-                                        local progress, xpInLevel, xpNeeded = GetLevelProgress(pData.xp, level)
-                                        Events.XPUpdate:FireClient(player, {
-                                            xp = pData.xp,
-                                            xpGained = bonusXP,
-                                            reason = "High Jump Bonus",
-                                            level = level,
-                                            levelName = LevelConfig[level].name,
-                                            levelIcon = LevelConfig[level].icon,
-                                            trailType = LevelConfig[level].trailType,
-                                            progress = progress,
-                                            xpInLevel = xpInLevel,
-                                            xpNeeded = xpNeeded
-                                        })
-                                        Events.ItemEffect:FireClient(player, "Reward", {
-                                            message = "⭐ HIGH JUMP BONUS! +" .. bonusXP .. " XP"
-                                        })
-                                    end
-
-                                    -- 시각 효과
-                                    local origSize = rewardBox.Size
-                                    rewardBox.Size = Vector3.new(1, 1, 1)
-                                    rewardBox.Transparency = 0.8
-                                    rewardBox.BrickColor = BrickColor.new("White")
-
-                                    task.delay(5, function()
-                                        if rewardBox and rewardBox.Parent then
-                                            rewardBox.Size = origSize
-                                            rewardBox.Transparency = 0.3
-                                            rewardBox.BrickColor = BrickColor.new("Bright yellow")
-                                            rewardDb[player] = nil
-                                        end
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-
-                task.wait(0.03)
-            end
-        end)
-
         pad.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
             local hum = hit.Parent:FindFirstChild("Humanoid")
             local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-
-            if hum and rp and player and not db[hit.Parent] then
+            if hum and rp and not db[hit.Parent] then
                 db[hit.Parent] = true
-
-                -- 🚀 하이점프 조건: Booster 아이템 사용 중이면 하이점프
-                local isHighJump = false
-                if hum.WalkSpeed > 16 * 1.3 then  -- Booster 사용 중 (속도 증가 상태)
-                    isHighJump = true
-                end
-
                 local bv = Instance.new("BodyVelocity")
                 bv.MaxForce = Vector3.new(0, 100000, 0)
-
-                if isHighJump then
-                    bv.Velocity = Vector3.new(0, 80, 0)  -- 하이점프 (보상 박스 도달 가능)
-                    Events.ItemEffect:FireClient(player, "HighJump", {message = "🚀 HIGH JUMP!"})
-                else
-                    bv.Velocity = Vector3.new(0, 55, 0)  -- 일반 점프 (벽 넘기 적당)
-                end
-
+                bv.Velocity = Vector3.new(0, 90, 0)
                 bv.Parent = rp
                 Debris:AddItem(bv, 0.2)
                 task.delay(0.5, function() db[hit.Parent] = nil end)
             end
         end)
-
         table.insert(ActiveGimmicks, pad)
         table.insert(ActiveGimmicks, wall)
-        table.insert(ActiveGimmicks, rewardBox)
         return pad
     end
 })
@@ -1211,208 +848,101 @@ GimmickRegistry:Register({
     end
 })
 
--- 🥊 PunchingCorridor (스킬 업그레이드: 3레인 시스템 + 레인별 공격 패턴)
+-- 🥊 PunchingCorridor
 GimmickRegistry:Register({
     name = "PunchingCorridor",
     displayName = "펀칭 복도",
     icon = "🥊",
     difficulty = "medium",
-    description = "3레인 복도 - 글러브 패턴 보고 안전 레인으로 이동!",
+    description = "좁은 복도에서 글러브가 펀치",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
-        length = {type = "number", min = 50, max = 200, default = 100, label = "길이"},
-        laneCount = {type = "number", min = 2, max = 3, default = 3, label = "레인 수"}
+        length = {type = "number", min = 50, max = 200, default = 100, label = "길이"}
     },
     builder = function(parent, data)
         if not Config.EnablePunchingGloves then return end
         local zStart = data.z
         local length = data.length or 100
+        local corridorWidth = 12
         local TW = Config.TRACK_WIDTH
-        local laneCount = data.laneCount or 3
-        local corridorWidth = TW - 8  -- 넓은 복도
-        local laneWidth = corridorWidth / laneCount
-
-        -- 양쪽 벽
-        for _, side in ipairs({-1, 1}) do
+        for _, xOffset in ipairs({-corridorWidth/2 - 5, corridorWidth/2 + 5}) do
             local wall = Instance.new("Part")
-            wall.Size = Vector3.new(4, 10, length)
-            wall.Position = Vector3.new(side * (corridorWidth/2 + 2), 5, zStart + length/2)
+            wall.Size = Vector3.new((TW - corridorWidth) / 2, 10, length)
+            wall.Position = Vector3.new((xOffset > 0) and (TW/4 + corridorWidth/4) or (-TW/4 - corridorWidth/4), 5, zStart + length/2)
             wall.Anchored = true
             wall.BrickColor = BrickColor.new("Dark stone grey")
             wall.Material = Enum.Material.Brick
             wall.Parent = parent
             table.insert(ActiveGimmicks, wall)
         end
-
-        -- 레인 구분선 (바닥)
-        for i = 1, laneCount do
-            local xPos = -corridorWidth/2 + (i - 0.5) * laneWidth
-            local laneLine = Instance.new("Part")
-            laneLine.Size = Vector3.new(laneWidth - 1, 0.2, length)
-            laneLine.Position = Vector3.new(xPos, 0.1, zStart + length/2)
-            laneLine.Anchored = true
-            laneLine.CanCollide = false
-            laneLine.BrickColor = (i == 2) and BrickColor.new("Lime green") or BrickColor.new("Medium stone grey")
-            laneLine.Material = Enum.Material.SmoothPlastic
-            laneLine.Transparency = 0.5
-            laneLine.Parent = parent
-            table.insert(ActiveGimmicks, laneLine)
-        end
-
-        -- 안내 표지판
-        local signPart = Instance.new("Part")
-        signPart.Size = Vector3.new(16, 6, 1)
-        signPart.Position = Vector3.new(0, 6, zStart - 5)
-        signPart.Anchored = true
-        signPart.CanCollide = false
-        signPart.BrickColor = BrickColor.new("Bright yellow")
-        signPart.Parent = parent
-        local signGui = Instance.new("SurfaceGui")
-        signGui.Face = Enum.NormalId.Front
-        signGui.Parent = signPart
-        local signLabel = Instance.new("TextLabel")
-        signLabel.Size = UDim2.new(1, 0, 1, 0)
-        signLabel.BackgroundTransparency = 1
-        signLabel.Text = "🥊 펀칭 복도 🥊\n⚠️ 노란색 레인 피하기!"
-        signLabel.TextColor3 = Color3.new(0, 0, 0)
-        signLabel.TextScaled = true
-        signLabel.Font = Enum.Font.GothamBold
-        signLabel.Parent = signGui
-        table.insert(ActiveGimmicks, signPart)
-
-        -- 글러브 세트 (각 열에 laneCount개 글러브)
-        local numRows = math.floor(length / 30)
-        local gloveRows = {}
-
-        for row = 1, numRows do
-            local zPos = zStart + row * (length / (numRows + 1))
-            local rowGloves = {}
-
-            for lane = 1, laneCount do
-                local xPos = -corridorWidth/2 + (lane - 0.5) * laneWidth
-                local glove = Instance.new("Part")
-                glove.Name = "PunchingGlove_R" .. row .. "_L" .. lane
-                glove.Size = Vector3.new(laneWidth * 0.6, 4, 4)
-                glove.Position = Vector3.new(xPos, 8, zPos)  -- 위에서 대기
-                glove.Anchored = true
-                glove.BrickColor = BrickColor.new("Bright red")
-                glove.Material = Enum.Material.SmoothPlastic
-                glove.Transparency = 0.3
-                glove.Parent = parent
-
-                local gloveGui = Instance.new("SurfaceGui")
-                gloveGui.Face = Enum.NormalId.Front
-                gloveGui.Parent = glove
-                local gloveLabel = Instance.new("TextLabel")
-                gloveLabel.Size = UDim2.new(1, 0, 1, 0)
-                gloveLabel.BackgroundTransparency = 1
-                gloveLabel.Text = "🥊"
-                gloveLabel.TextScaled = true
-                gloveLabel.Parent = gloveGui
-
-                -- 레인 바닥 경고 표시
-                local warnFloor = Instance.new("Part")
-                warnFloor.Name = "WarnFloor_R" .. row .. "_L" .. lane
-                warnFloor.Size = Vector3.new(laneWidth - 2, 0.3, 6)
-                warnFloor.Position = Vector3.new(xPos, 0.15, zPos)
-                warnFloor.Anchored = true
-                warnFloor.CanCollide = false
-                warnFloor.BrickColor = BrickColor.new("Medium stone grey")
-                warnFloor.Material = Enum.Material.SmoothPlastic
-                warnFloor.Transparency = 0.3
-                warnFloor.Parent = parent
-
-                local db = {}
-                glove.Touched:Connect(function(hit)
-                    local player = Players:GetPlayerFromCharacter(hit.Parent)
-                    local hum = hit.Parent:FindFirstChild("Humanoid")
-                    if player and hum and not db[player] then
-                        db[player] = true
-                        local newSpeed = ApplySpeedBoost(player, -5)
-                        local origJump = hum.JumpPower
-                        hum.WalkSpeed = BASE_WALK_SPEED * 0.3
-                        hum.JumpPower = 0
-                        Events.ItemEffect:FireClient(player, "SpeedDown", {
-                            speedPercent = newSpeed,
-                            message = "👊 감속! -5%",
-                            stun = true
-                        })
-                        task.delay(1.5, function()
-                            if hum then
-                                hum.WalkSpeed = BASE_WALK_SPEED * (GetSpeedBoost(player) / 100)
-                                hum.JumpPower = origJump
-                            end
-                            db[player] = nil
-                        end)
-                    end
-                end)
-
-                table.insert(rowGloves, {glove = glove, warnFloor = warnFloor, xPos = xPos, zPos = zPos})
-                table.insert(ActiveGimmicks, glove)
-                table.insert(ActiveGimmicks, warnFloor)
-            end
-
-            table.insert(gloveRows, rowGloves)
-        end
-
-        -- 패턴 기반 공격 로직 (각 열마다 1~2개 레인만 공격)
-        task.spawn(function()
-            while gloveRows[1] and gloveRows[1][1].glove.Parent do
-                for rowIdx, rowGloves in ipairs(gloveRows) do
-                    -- 랜덤하게 1~2개 레인 선택 (최소 1개는 안전)
-                    local attackLanes = {}
-                    local safeCount = math.random(1, laneCount - 1)
-                    for i = 1, laneCount do
-                        if i <= laneCount - safeCount then
-                            table.insert(attackLanes, i)
-                        end
-                    end
-                    -- 셔플
-                    for i = #attackLanes, 2, -1 do
-                        local j = math.random(1, i)
-                        attackLanes[i], attackLanes[j] = attackLanes[j], attackLanes[i]
-                    end
-
-                    -- 경고 표시 (노란색)
-                    for lane, gloveData in ipairs(rowGloves) do
-                        local isAttacking = false
-                        for _, aLane in ipairs(attackLanes) do
-                            if aLane == lane then isAttacking = true break end
-                        end
-                        if isAttacking then
-                            gloveData.warnFloor.BrickColor = BrickColor.new("Bright yellow")
-                            gloveData.glove.Transparency = 0
-                        else
-                            gloveData.warnFloor.BrickColor = BrickColor.new("Lime green")
-                            gloveData.glove.Transparency = 0.7
-                        end
-                    end
-
-                    task.wait(0.8)  -- 경고 시간
-
-                    -- 공격!
-                    for lane, gloveData in ipairs(rowGloves) do
-                        local isAttacking = false
-                        for _, aLane in ipairs(attackLanes) do
-                            if aLane == lane then isAttacking = true break end
-                        end
-                        if isAttacking then
-                            gloveData.warnFloor.BrickColor = BrickColor.new("Really red")
-                            local downPos = Vector3.new(gloveData.xPos, 3, gloveData.zPos)
-                            local upPos = Vector3.new(gloveData.xPos, 8, gloveData.zPos)
-                            TweenService:Create(gloveData.glove, TweenInfo.new(0.15, Enum.EasingStyle.Back), {Position = downPos}):Play()
-                            task.delay(0.3, function()
-                                TweenService:Create(gloveData.glove, TweenInfo.new(0.3), {Position = upPos}):Play()
-                                gloveData.warnFloor.BrickColor = BrickColor.new("Medium stone grey")
-                            end)
-                        end
-                    end
-
-                    task.wait(0.5)
+        local numGloves = math.floor(length / 25)
+        for i = 1, numGloves do
+            local zPos = zStart + i * (length / (numGloves + 1))
+            local side = (i % 2 == 0) and 1 or -1
+            local xPos = side * (corridorWidth/2 + 3)
+            local glove = Instance.new("Part")
+            glove.Name = "PunchingGlove"
+            glove.Size = Vector3.new(5, 5, 5)
+            glove.Position = Vector3.new(xPos, 4, zPos)
+            glove.Anchored = true
+            glove.BrickColor = BrickColor.new("Bright red")
+            glove.Material = Enum.Material.SmoothPlastic
+            glove.Parent = parent
+            local gloveGui = Instance.new("SurfaceGui")
+            gloveGui.Face = (side == 1) and Enum.NormalId.Left or Enum.NormalId.Right
+            gloveGui.Parent = glove
+            local gloveLabel = Instance.new("TextLabel")
+            gloveLabel.Size = UDim2.new(1, 0, 1, 0)
+            gloveLabel.BackgroundTransparency = 1
+            gloveLabel.Text = "🥊"
+            gloveLabel.TextScaled = true
+            gloveLabel.Parent = gloveGui
+            local gloveFrontGui = Instance.new("SurfaceGui")
+            gloveFrontGui.Face = Enum.NormalId.Front
+            gloveFrontGui.Parent = glove
+            local gloveFrontLabel = Instance.new("TextLabel")
+            gloveFrontLabel.Size = UDim2.new(1, 0, 1, 0)
+            gloveFrontLabel.BackgroundTransparency = 1
+            gloveFrontLabel.Text = "🥊"
+            gloveFrontLabel.TextScaled = true
+            gloveFrontLabel.Parent = gloveFrontGui
+            local retracted = Vector3.new(xPos, 4, zPos)
+            local extended = Vector3.new(-side * (corridorWidth/2 - 2), 4, zPos)
+            task.spawn(function()
+                task.wait(i * 0.3)
+                while glove and glove.Parent do
+                    task.wait(2 / Config.ObstacleSpeed)
+                    glove.BrickColor = BrickColor.new("Really red")
+                    task.wait(0.3)
+                    TweenService:Create(glove, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Position = extended}):Play()
+                    task.wait(0.2)
+                    TweenService:Create(glove, TweenInfo.new(0.4), {Position = retracted}):Play()
+                    glove.BrickColor = BrickColor.new("Bright red")
+                    task.wait(0.4)
                 end
-                task.wait(1.0)  -- 사이클 간 휴식
-            end
-        end)
+            end)
+            local db = {}
+            glove.Touched:Connect(function(hit)
+                local player = Players:GetPlayerFromCharacter(hit.Parent)
+                local hum = hit.Parent:FindFirstChild("Humanoid")
+                if player and hum and not db[player] then
+                    db[player] = true
+                    local origSpeed = hum.WalkSpeed
+                    local origJump = hum.JumpPower
+                    hum.WalkSpeed = origSpeed * 0.3
+                    hum.JumpPower = 0
+                    Events.ItemEffect:FireClient(player, "PunchStun", {duration = 1.5})
+                    task.delay(1.5, function()
+                        if hum then
+                            hum.WalkSpeed = origSpeed
+                            hum.JumpPower = origJump
+                        end
+                        db[player] = nil
+                    end)
+                end
+            end)
+            table.insert(ActiveGimmicks, glove)
+        end
     end
 })
 
@@ -1495,17 +1025,12 @@ GimmickRegistry:Register({
             gate.Touched:Connect(function(hit)
                 local player = Players:GetPlayerFromCharacter(hit.Parent)
                 if not player or db[player] then return end
-                db[player] = true  -- 정답/오답 모두 디바운스 설정
                 local answer = PlayerGateAnswers[player] and PlayerGateAnswers[player][gateId]
                 if answer == i then
-                    -- 정답: +10% 속도 부스트
-                    local newSpeed = ApplySpeedBoost(player, 10)
-                    Events.ItemEffect:FireClient(player, "SpeedUp", {
-                        speedPercent = newSpeed,
-                        message = "🚀 가속! +10%"
-                    })
-                    task.delay(1, function() db[player] = nil end)
+                    Events.ItemEffect:FireClient(player, "GateCorrect", {})
+                    AwardXP(player, XPRewards.QuizCorrect, "Quiz Correct!")
                 else
+                    db[player] = true
                     local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
                     local hum = hit.Parent:FindFirstChild("Humanoid")
                     if hum and rp then
@@ -1580,14 +1105,12 @@ GimmickRegistry:Register({
         hole.BrickColor = BrickColor.new("Really black")
         hole.Parent = parent
         local trigger = Instance.new("Part")
-        trigger.Size = Vector3.new(TW, 15, 8)  -- 더 큰 감지 영역
-        trigger.Position = Vector3.new(0, 7, triggerZ)
+        trigger.Size = Vector3.new(TW, 10, 5)
+        trigger.Position = Vector3.new(0, 5, triggerZ)
         trigger.Anchored = true
         trigger.CanCollide = false
-        trigger.Transparency = 0.9  -- 약간 보이게 (디버그용)
-        trigger.BrickColor = BrickColor.new("Magenta")
+        trigger.Transparency = 1
         trigger.Parent = parent
-        print("🛗 Elevator", elevId, "trigger created at Z:", triggerZ)
         local triggerFloor = Instance.new("Part")
         triggerFloor.Size = Vector3.new(TW, 0.5, 5)
         triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
@@ -1656,12 +1179,8 @@ GimmickRegistry:Register({
                 if not player or platDb[player] then return end
                 platDb[player] = true
                 if i == quiz.a then
-                    -- 정답: +10% 속도 부스트
-                    local newSpeed = ApplySpeedBoost(player, 10)
-                    Events.ItemEffect:FireClient(player, "SpeedUp", {
-                        speedPercent = newSpeed,
-                        message = "🚀 가속! +10%"
-                    })
+                    Events.ItemEffect:FireClient(player, "GateCorrect", {})
+                    AwardXP(player, XPRewards.QuizCorrect, "Elevator Correct!")
                 else
                     Events.ItemEffect:FireClient(player, "GateWrong", {})
                 end
@@ -1712,7 +1231,6 @@ GimmickRegistry:Register({
             local player = Players:GetPlayerFromCharacter(hit.Parent)
             if not player or triggered[player] then return end
             triggered[player] = true
-            print("🛗 Elevator triggered by", player.Name, "- Quiz shown, platforms will move in 5s")
             Events.GateQuiz:FireClient(player, {
                 gateId = "elev" .. elevId,
                 question = quiz.q,
@@ -1722,29 +1240,18 @@ GimmickRegistry:Register({
                 colors = gateColors
             })
             task.delay(5, function()
-                print("🛗 [ELEV", elevId, "] Platforms starting to move! Count:", #platforms)
-                if #platforms == 0 then
-                    print("⚠️ [ELEV", elevId, "] No platforms to move!")
-                    return
-                end
-                for idx, p in ipairs(platforms) do
-                    if p and p.plat and p.plat.Parent then
-                        local riseTime = p.correct and 1.5 or 4
-                        local targetY = p.targetY
-                        local currentPos = p.plat.Position
-                        print("🛗 [ELEV", elevId, "] Platform", idx, "moving from Y:", currentPos.Y, "to Y:", targetY, "in", riseTime, "sec")
-                        TweenService:Create(p.plat, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
-                            Position = Vector3.new(currentPos.X, targetY, currentPos.Z)
-                        }):Play()
-                        TweenService:Create(p.colorTop, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
-                            Position = Vector3.new(p.colorTop.Position.X, targetY + 2.25, p.colorTop.Position.Z)
-                        }):Play()
-                        TweenService:Create(p.numPart, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
-                            Position = Vector3.new(p.numPart.Position.X, targetY + 5, p.numPart.Position.Z)
-                        }):Play()
-                    else
-                        print("⚠️ [ELEV", elevId, "] Platform", idx, "is missing or destroyed!")
-                    end
+                for i, p in ipairs(platforms) do
+                    local riseTime = p.correct and 1.5 or 4
+                    local targetY = p.targetY
+                    TweenService:Create(p.plat, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
+                        Position = Vector3.new(p.plat.Position.X, targetY, p.plat.Position.Z)
+                    }):Play()
+                    TweenService:Create(p.colorTop, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
+                        Position = Vector3.new(p.colorTop.Position.X, targetY + 2.25, p.colorTop.Position.Z)
+                    }):Play()
+                    TweenService:Create(p.numPart, TweenInfo.new(riseTime, Enum.EasingStyle.Quad), {
+                        Position = Vector3.new(p.numPart.Position.X, targetY + 5, p.numPart.Position.Z)
+                    }):Play()
                 end
             end)
             task.delay(25, function()
@@ -1764,18 +1271,17 @@ GimmickRegistry:Register({
     end
 })
 
--- ⬅️ ConveyorBelt (스킬 업그레이드: 사이드 안전 레인)
+-- ⬅️ ConveyorBelt
 GimmickRegistry:Register({
     name = "ConveyorBelt",
     displayName = "컨베이어 벨트",
     icon = "⬅️",
     difficulty = "medium",
-    description = "뒤로 밀리는 바닥 - 양쪽 가장자리 안전 레인으로 통과!",
+    description = "뒤로 밀리는 바닥",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
         length = {type = "number", min = 20, max = 200, default = 60, label = "길이"},
-        direction = {type = "number", min = -1, max = 1, default = -1, label = "방향 (-1: 뒤로)"},
-        safeLaneWidth = {type = "number", min = 2, max = 6, default = 4, label = "안전 레인 너비"}
+        direction = {type = "number", min = -1, max = 1, default = -1, label = "방향 (-1: 뒤로)"}
     },
     builder = function(parent, data)
         if not Config.EnableConveyorBelt then return end
@@ -1783,44 +1289,15 @@ GimmickRegistry:Register({
         local length = data.length or 60
         local direction = data.direction or -1
         local TW = Config.TRACK_WIDTH
-        local safeLaneWidth = data.safeLaneWidth or 4
-
-        -- 중앙 컨베이어 벨트 (밀리는 구역)
-        local beltWidth = TW - 4 - (safeLaneWidth * 2)
         local belt = Instance.new("Part")
-        belt.Name = "ConveyorBelt"
-        belt.Size = Vector3.new(beltWidth, 1, length)
+        belt.Size = Vector3.new(TW - 4, 1, length)
         belt.Position = Vector3.new(0, 0.5, zStart + length/2)
         belt.Anchored = true
         belt.BrickColor = BrickColor.new("Dark stone grey")
         belt.Material = Enum.Material.DiamondPlate
         belt.Parent = parent
-
-        -- 왼쪽 안전 레인 (초록)
-        local leftLane = Instance.new("Part")
-        leftLane.Name = "SafeLane_Left"
-        leftLane.Size = Vector3.new(safeLaneWidth, 1, length)
-        leftLane.Position = Vector3.new(-(beltWidth/2 + safeLaneWidth/2), 0.5, zStart + length/2)
-        leftLane.Anchored = true
-        leftLane.BrickColor = BrickColor.new("Lime green")
-        leftLane.Material = Enum.Material.SmoothPlastic
-        leftLane.Parent = parent
-        table.insert(ActiveGimmicks, leftLane)
-
-        -- 오른쪽 안전 레인 (초록)
-        local rightLane = Instance.new("Part")
-        rightLane.Name = "SafeLane_Right"
-        rightLane.Size = Vector3.new(safeLaneWidth, 1, length)
-        rightLane.Position = Vector3.new(beltWidth/2 + safeLaneWidth/2, 0.5, zStart + length/2)
-        rightLane.Anchored = true
-        rightLane.BrickColor = BrickColor.new("Lime green")
-        rightLane.Material = Enum.Material.SmoothPlastic
-        rightLane.Parent = parent
-        table.insert(ActiveGimmicks, rightLane)
-
-        -- 경고 표지판
         local signPart = Instance.new("Part")
-        signPart.Size = Vector3.new(14, 5, 1)
+        signPart.Size = Vector3.new(10, 5, 1)
         signPart.Position = Vector3.new(0, 5, zStart - 3)
         signPart.Anchored = true
         signPart.CanCollide = false
@@ -1833,13 +1310,11 @@ GimmickRegistry:Register({
         local signLabel = Instance.new("TextLabel")
         signLabel.Size = UDim2.new(1, 0, 1, 0)
         signLabel.BackgroundTransparency = 1
-        signLabel.Text = "⬅️ CONVEYOR\n🟢 가장자리 = 안전!"
+        signLabel.Text = "⬅️ CONVEYOR"
         signLabel.TextColor3 = Color3.new(0, 0, 0)
         signLabel.TextScaled = true
         signLabel.Font = Enum.Font.GothamBold
         signLabel.Parent = signGui
-
-        -- 컨베이어 밀기 로직 (중앙 벨트만)
         local playersOnBelt = {}
         belt.Touched:Connect(function(hit)
             local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
@@ -1847,12 +1322,14 @@ GimmickRegistry:Register({
         end)
         belt.TouchEnded:Connect(function(hit) playersOnBelt[hit.Parent] = nil end)
 
-        local beltSpeed = 0.3 * (direction or -1)
+        -- 컨베이어 벨트 힘 (강화됨)
+        local beltSpeed = 0.3 * (direction or -1)  -- 더 강한 힘
         task.spawn(function()
             while belt and belt.Parent do
                 for char, _ in pairs(playersOnBelt) do
                     local rp = char:FindFirstChild("HumanoidRootPart")
                     if rp then
+                        -- AssemblyLinearVelocity로 더 자연스러운 밀기
                         local currentVel = rp.AssemblyLinearVelocity
                         rp.AssemblyLinearVelocity = Vector3.new(
                             currentVel.X,
@@ -1861,79 +1338,60 @@ GimmickRegistry:Register({
                         )
                     end
                 end
-                task.wait(0.05)
+                task.wait(0.05)  -- 약간의 딜레이로 성능 개선
             end
         end)
-
         table.insert(ActiveGimmicks, belt)
         table.insert(ActiveGimmicks, signPart)
         return belt
     end
 })
 
--- ⚡ ElectricFloor (스킬 업그레이드: 3레인 순차 감전, 안전 지대)
+-- ⚡ ElectricFloor
 GimmickRegistry:Register({
     name = "ElectricFloor",
     displayName = "전기 바닥",
     icon = "⚡",
     difficulty = "medium",
-    description = "3레인 순차 감전 - 안전한 레인으로 이동하며 통과!",
+    description = "주기적으로 감전되는 바닥",
     schema = {
         z = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
-        length = {type = "number", min = 20, max = 200, default = 60, label = "길이"},
-        laneCount = {type = "number", min = 2, max = 4, default = 3, label = "레인 수"}
+        length = {type = "number", min = 20, max = 200, default = 60, label = "길이"}
     },
     builder = function(parent, data)
         if not Config.EnableElectricFloor then return end
         local zStart = data.z
         local length = data.length or 60
         local TW = Config.TRACK_WIDTH
-        local laneCount = data.laneCount or 3
-        local laneWidth = (TW - 4) / laneCount
-        local lanes = {}
-        local playersOnLane = {}
-
-        -- 레인별 바닥 생성
-        for i = 1, laneCount do
-            local xPos = -((TW - 4) / 2) + (i - 0.5) * laneWidth
-            local lane = Instance.new("Part")
-            lane.Name = "ElectricLane_" .. i
-            lane.Size = Vector3.new(laneWidth - 1, 0.5, length)
-            lane.Position = Vector3.new(xPos, 0.25, zStart + length/2)
-            lane.Anchored = true
-            lane.BrickColor = BrickColor.new("Medium stone grey")
-            lane.Material = Enum.Material.Metal
-            lane.Parent = parent
-
-            -- 레인 번호 표시
-            local laneMarker = Instance.new("Part")
-            laneMarker.Size = Vector3.new(laneWidth - 2, 0.1, 4)
-            laneMarker.Position = Vector3.new(xPos, 0.55, zStart + 5)
-            laneMarker.Anchored = true
-            laneMarker.CanCollide = false
-            laneMarker.Transparency = 0.5
-            laneMarker.BrickColor = BrickColor.new("Lime green")
-            laneMarker.Material = Enum.Material.Neon
-            laneMarker.Parent = parent
-            table.insert(ActiveGimmicks, laneMarker)
-
-            playersOnLane[i] = {}
-            lane.Touched:Connect(function(hit)
-                local player = Players:GetPlayerFromCharacter(hit.Parent)
-                if player then playersOnLane[i][player] = true end
-            end)
-            lane.TouchEnded:Connect(function(hit)
-                local player = Players:GetPlayerFromCharacter(hit.Parent)
-                if player then playersOnLane[i][player] = nil end
-            end)
-
-            table.insert(lanes, lane)
-            table.insert(ActiveGimmicks, lane)
+        local floor = Instance.new("Part")
+        floor.Name = "ElectricFloor"
+        floor.Size = Vector3.new(TW - 4, 0.5, length + 20)
+        floor.Position = Vector3.new(0, 0.25, zStart + length/2)
+        floor.Anchored = true
+        floor.BrickColor = BrickColor.new("Medium stone grey")
+        floor.Material = Enum.Material.Metal
+        floor.Parent = parent
+        for i = 1, math.floor(length / 12) do
+            local boltPart = Instance.new("Part")
+            boltPart.Size = Vector3.new(5, 0.1, 5)
+            boltPart.Position = Vector3.new(math.random(-12, 12), 0.35, zStart + i * 12)
+            boltPart.Anchored = true
+            boltPart.CanCollide = false
+            boltPart.Transparency = 1
+            boltPart.Parent = parent
+            local boltGui = Instance.new("SurfaceGui")
+            boltGui.Face = Enum.NormalId.Top
+            boltGui.Parent = boltPart
+            local boltLabel = Instance.new("TextLabel")
+            boltLabel.Size = UDim2.new(1, 0, 1, 0)
+            boltLabel.BackgroundTransparency = 1
+            boltLabel.Text = "⚡"
+            boltLabel.TextScaled = true
+            boltLabel.Parent = boltGui
+            table.insert(ActiveGimmicks, boltPart)
         end
-
-        -- 경고 표지판
         local warnSign = Instance.new("Part")
-        warnSign.Size = Vector3.new(16, 6, 1)
+        warnSign.Size = Vector3.new(12, 6, 1)
         warnSign.Position = Vector3.new(0, 5, zStart - 5)
         warnSign.Anchored = true
         warnSign.CanCollide = false
@@ -1945,152 +1403,59 @@ GimmickRegistry:Register({
         local warnLabel = Instance.new("TextLabel")
         warnLabel.Size = UDim2.new(1, 0, 1, 0)
         warnLabel.BackgroundTransparency = 1
-        warnLabel.Text = "⚡ 순차 감전! ⚡\n🟢 초록 레인 = 안전"
+        warnLabel.Text = "⚡ DANGER ⚡"
         warnLabel.TextColor3 = Color3.new(0, 0, 0)
         warnLabel.TextScaled = true
         warnLabel.Font = Enum.Font.GothamBold
         warnLabel.Parent = warnGui
-        table.insert(ActiveGimmicks, warnSign)
-
-        -- 순차 감전 로직
+        local playersOnFloor = {}
+        floor.Touched:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player then playersOnFloor[player] = true end
+        end)
+        floor.TouchEnded:Connect(function(hit)
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if player then playersOnFloor[player] = nil end
+        end)
         task.spawn(function()
-            local currentDanger = 1
-            while lanes[1] and lanes[1].Parent do
-                -- 모든 레인 안전 상태로 (노란색 경고)
-                for i, lane in ipairs(lanes) do
-                    if i == currentDanger then
-                        lane.BrickColor = BrickColor.new("Bright yellow")  -- 다음 감전 예고
-                    else
-                        lane.BrickColor = BrickColor.new("Lime green")  -- 안전
-                    end
-                    lane.Material = Enum.Material.SmoothPlastic
+            while floor and floor.Parent do
+                floor.BrickColor = BrickColor.new("Bright yellow")
+                floor.Material = Enum.Material.Metal
+                task.wait(1.5)
+                floor.BrickColor = BrickColor.new("Cyan")
+                floor.Material = Enum.Material.Neon
+                for player, _ in pairs(playersOnFloor) do
+                    Events.ItemEffect:FireClient(player, "Electrocuted", {duration = 0.8})
                 end
-                task.wait(1.0)  -- 예고 시간
-
-                -- 감전!
-                local dangerLane = lanes[currentDanger]
-                if dangerLane then
-                    dangerLane.BrickColor = BrickColor.new("Cyan")
-                    dangerLane.Material = Enum.Material.Neon
-
-                    -- 해당 레인에 있는 플레이어 감전
-                    for player, _ in pairs(playersOnLane[currentDanger]) do
-                        local newSpeed = ApplySpeedBoost(player, -5)
-                        Events.ItemEffect:FireClient(player, "SpeedDown", {
-                            speedPercent = newSpeed,
-                            message = "⚡ 감전! -5%",
-                            stun = true
-                        })
-                    end
-                end
-                task.wait(0.5)
-
-                -- 다음 레인으로
-                currentDanger = currentDanger + 1
-                if currentDanger > laneCount then
-                    currentDanger = 1
-                end
-                task.wait(0.5)
+                task.wait(0.6)
+                floor.BrickColor = BrickColor.new("Medium stone grey")
+                floor.Material = Enum.Material.Metal
+                task.wait(2)
             end
         end)
-
-        return lanes[1]
+        table.insert(ActiveGimmicks, floor)
+        table.insert(ActiveGimmicks, warnSign)
+        return floor
     end
 })
 
--- 🪨 RollingBoulder (스킬 업그레이드: 양쪽 회피 홈 + 경고 시스템)
+-- 🪨 RollingBoulder
 GimmickRegistry:Register({
     name = "RollingBoulder",
     displayName = "굴러오는 바위",
     icon = "🪨",
     difficulty = "hard",
-    description = "바위가 굴러오면 양쪽 홈으로 회피!",
+    description = "뒤에서 굴러오는 바위",
     schema = {
         zStart = {type = "number", min = 0, max = 2000, default = 100, label = "시작 위치 (Z)"},
-        zEnd = {type = "number", min = 0, max = 2000, default = 200, label = "끝 위치 (Z)"},
-        alcoveCount = {type = "number", min = 2, max = 6, default = 3, label = "회피 홈 개수"}
+        zEnd = {type = "number", min = 0, max = 2000, default = 200, label = "끝 위치 (Z)"}
     },
     builder = function(parent, data)
         if not Config.EnableRollingBoulder then return end
         local zStart = data.zStart
         local zEnd = data.zEnd
-        local TW = Config.TRACK_WIDTH
-        local alcoveCount = data.alcoveCount or 3
-        local sectionLength = (zEnd - zStart) / alcoveCount
-
-        -- 중앙 바위길 (좁음)
-        local pathWidth = 16
-        local mainPath = Instance.new("Part")
-        mainPath.Name = "BoulderPath"
-        mainPath.Size = Vector3.new(pathWidth, 1, zEnd - zStart)
-        mainPath.Position = Vector3.new(0, 0.5, (zStart + zEnd) / 2)
-        mainPath.Anchored = true
-        mainPath.BrickColor = BrickColor.new("Dark stone grey")
-        mainPath.Material = Enum.Material.Slate
-        mainPath.Parent = parent
-        table.insert(ActiveGimmicks, mainPath)
-
-        -- 양쪽 벽 (홈 제외)
-        local wallHeight = 6
-        for _, side in ipairs({-1, 1}) do
-            local wall = Instance.new("Part")
-            wall.Size = Vector3.new(3, wallHeight, zEnd - zStart)
-            wall.Position = Vector3.new(side * (pathWidth/2 + 1.5), wallHeight/2, (zStart + zEnd) / 2)
-            wall.Anchored = true
-            wall.BrickColor = BrickColor.new("Reddish brown")
-            wall.Material = Enum.Material.Brick
-            wall.Parent = parent
-            table.insert(ActiveGimmicks, wall)
-        end
-
-        -- 회피 홈 생성 (양쪽에)
-        local alcoves = {}
-        for i = 1, alcoveCount do
-            local alcoveZ = zStart + (i - 0.5) * sectionLength
-            for _, side in ipairs({-1, 1}) do
-                local alcoveWidth = 8
-                local alcoveDepth = 10
-
-                -- 홈 바닥
-                local alcoveFloor = Instance.new("Part")
-                alcoveFloor.Name = "Alcove_" .. i .. "_" .. (side == -1 and "L" or "R")
-                alcoveFloor.Size = Vector3.new(alcoveDepth, 1, alcoveWidth)
-                alcoveFloor.Position = Vector3.new(side * (pathWidth/2 + alcoveDepth/2 + 2), 0.5, alcoveZ)
-                alcoveFloor.Anchored = true
-                alcoveFloor.BrickColor = BrickColor.new("Lime green")
-                alcoveFloor.Material = Enum.Material.Grass
-                alcoveFloor.Parent = parent
-
-                -- 홈 표시 (화살표)
-                local alcoveSign = Instance.new("Part")
-                alcoveSign.Size = Vector3.new(2, 3, 0.5)
-                alcoveSign.Position = Vector3.new(side * (pathWidth/2 + 1), 2, alcoveZ)
-                alcoveSign.Anchored = true
-                alcoveSign.CanCollide = false
-                alcoveSign.BrickColor = BrickColor.new("Lime green")
-                alcoveSign.Material = Enum.Material.Neon
-                alcoveSign.Parent = parent
-                local signGui = Instance.new("SurfaceGui")
-                signGui.Face = (side == -1) and Enum.NormalId.Right or Enum.NormalId.Left
-                signGui.Parent = alcoveSign
-                local signLabel = Instance.new("TextLabel")
-                signLabel.Size = UDim2.new(1, 0, 1, 0)
-                signLabel.BackgroundTransparency = 1
-                signLabel.Text = (side == -1) and "◀" or "▶"
-                signLabel.TextColor3 = Color3.new(1, 1, 1)
-                signLabel.TextScaled = true
-                signLabel.Font = Enum.Font.GothamBold
-                signLabel.Parent = signGui
-
-                table.insert(alcoves, {floor = alcoveFloor, sign = alcoveSign, z = alcoveZ})
-                table.insert(ActiveGimmicks, alcoveFloor)
-                table.insert(ActiveGimmicks, alcoveSign)
-            end
-        end
-
-        -- 경고 표지판
         local warnSign = Instance.new("Part")
-        warnSign.Size = Vector3.new(16, 8, 1)
+        warnSign.Size = Vector3.new(12, 8, 1)
         warnSign.Position = Vector3.new(0, 6, zStart - 15)
         warnSign.Anchored = true
         warnSign.CanCollide = false
@@ -2100,95 +1465,41 @@ GimmickRegistry:Register({
         warnGui.Face = Enum.NormalId.Front
         warnGui.Parent = warnSign
         local warnLabel = Instance.new("TextLabel")
-        warnLabel.Size = UDim2.new(1, 0, 1, 0)
+        warnLabel.Size = UDim2.new(1,0,1,0)
         warnLabel.BackgroundTransparency = 1
-        warnLabel.Text = "🪨 BOULDER ZONE 🪨\n◀ 홈으로 회피! ▶"
-        warnLabel.TextColor3 = Color3.new(1, 1, 1)
+        warnLabel.Text = "⚠️ BOULDER! ⚠️\n🪨 DODGE! 🪨"
+        warnLabel.TextColor3 = Color3.new(1,1,1)
         warnLabel.TextScaled = true
         warnLabel.Font = Enum.Font.GothamBold
         warnLabel.Parent = warnGui
-        table.insert(ActiveGimmicks, warnSign)
-
-        -- 경고 라이트 (바위 올 때 깜빡임)
-        local warnLight = Instance.new("Part")
-        warnLight.Size = Vector3.new(pathWidth, 0.3, 5)
-        warnLight.Position = Vector3.new(0, 0.65, zEnd - 5)
-        warnLight.Anchored = true
-        warnLight.CanCollide = false
-        warnLight.BrickColor = BrickColor.new("Medium stone grey")
-        warnLight.Material = Enum.Material.SmoothPlastic
-        warnLight.Transparency = 0.3
-        warnLight.Parent = parent
-        table.insert(ActiveGimmicks, warnLight)
-
-        -- 바위 스폰 로직
         task.spawn(function()
             while parent and parent.Parent do
-                -- 경고 시작 (3초 전)
-                warnLight.BrickColor = BrickColor.new("Bright yellow")
-                warnLight.Material = Enum.Material.Neon
-                for _, alcove in ipairs(alcoves) do
-                    alcove.sign.BrickColor = BrickColor.new("Bright yellow")
-                end
-                task.wait(1)
-
-                -- 위험 경고 (깜빡임)
-                for flash = 1, 4 do
-                    warnLight.BrickColor = BrickColor.new("Really red")
-                    task.wait(0.25)
-                    warnLight.BrickColor = BrickColor.new("Bright yellow")
-                    task.wait(0.25)
-                end
-
-                -- 바위 발사!
-                warnLight.BrickColor = BrickColor.new("Really red")
+                task.wait(7 / Config.ObstacleSpeed)
                 local boulder = Instance.new("Part")
-                boulder.Name = "Boulder"
-                boulder.Size = Vector3.new(12, 12, 12)
-                boulder.Position = Vector3.new(0, 7, zEnd + 10)
+                boulder.Size = Vector3.new(10, 10, 10)
+                boulder.Position = Vector3.new(0, 6, zEnd + 5)
                 boulder.Anchored = false
                 boulder.Shape = Enum.PartType.Ball
                 boulder.BrickColor = BrickColor.new("Dark stone grey")
                 boulder.Material = Enum.Material.Slate
                 boulder.Parent = parent
-
                 local bv = Instance.new("BodyVelocity")
                 bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                bv.Velocity = Vector3.new(0, 0, -40 * Config.ObstacleSpeed)
+                bv.Velocity = Vector3.new(0, 0, -45 * Config.ObstacleSpeed)
                 bv.Parent = boulder
-
                 local db = {}
                 boulder.Touched:Connect(function(hit)
                     local player = Players:GetPlayerFromCharacter(hit.Parent)
                     if player and not db[player] then
                         db[player] = true
-                        local newSpeed = ApplySpeedBoost(player, -5)
-                        Events.ItemEffect:FireClient(player, "SpeedDown", {
-                            speedPercent = newSpeed,
-                            message = "🪨 으악! -5%",
-                            direction = Vector3.new(0, 40, -60)
-                        })
+                        Events.ItemEffect:FireClient(player, "BoulderHit", {direction = Vector3.new(0, 35, -55)})
                         task.delay(1, function() db[player] = nil end)
                     end
                 end)
-
-                -- 바위가 지나간 후 안전 표시 복구
-                task.delay(3, function()
-                    warnLight.BrickColor = BrickColor.new("Medium stone grey")
-                    warnLight.Material = Enum.Material.SmoothPlastic
-                    for _, alcove in ipairs(alcoves) do
-                        alcove.sign.BrickColor = BrickColor.new("Lime green")
-                    end
-                end)
-
-                task.delay(10, function()
-                    if boulder and boulder.Parent then boulder:Destroy() end
-                end)
-
-                task.wait(6 / Config.ObstacleSpeed)
+                task.delay(12, function() if boulder and boulder.Parent then boulder:Destroy() end end)
             end
         end)
-
+        table.insert(ActiveGimmicks, warnSign)
         return warnSign
     end
 })
@@ -2303,276 +1614,7 @@ GimmickRegistry:Register({
     end
 })
 
--- 🌀 PortalMaze (퀴즈 + 텔레포트 조합)
-GimmickRegistry:Register({
-    name = "PortalMaze",
-    displayName = "포탈 미로",
-    icon = "🌀",
-    difficulty = "medium",
-    description = "퀴즈 정답 포탈로 들어가면 앞으로, 오답은 시작점으로!",
-    schema = {
-        id = {type = "number", min = 1, max = 100, default = 1, label = "포탈 ID"},
-        triggerZ = {type = "number", min = 0, max = 2000, default = 100, label = "트리거 위치"},
-        portalZ = {type = "number", min = 0, max = 2000, default = 130, label = "포탈 위치"},
-        exitZ = {type = "number", min = 0, max = 2000, default = 180, label = "정답 출구 위치"},
-        options = {type = "number", min = 2, max = 4, default = 3, label = "포탈 수"}
-    },
-    builder = function(parent, data)
-        if not Config.EnablePortalMaze then return end
-
-        local portalId = data.id or 1
-        local triggerZ = data.triggerZ
-        local portalZ = data.portalZ
-        local exitZ = data.exitZ
-        local optionCount = data.options or 3
-        local quiz = GetQuizByOptionCount(optionCount)
-        local TW = Config.TRACK_WIDTH
-        local startZ = triggerZ - 10  -- 오답 시 돌아갈 위치
-
-        -- 포탈 색상
-        local portalColors = {
-            Color3.fromRGB(255, 80, 80),   -- 빨강
-            Color3.fromRGB(80, 150, 255),  -- 파랑
-            Color3.fromRGB(80, 255, 80),   -- 초록
-            Color3.fromRGB(255, 220, 80),  -- 노랑
-        }
-
-        -- 트리거 존 (퀴즈 표시)
-        local trigger = Instance.new("Part")
-        trigger.Name = "PortalTrigger_" .. portalId
-        trigger.Size = Vector3.new(TW, 10, 5)
-        trigger.Position = Vector3.new(0, 5, triggerZ)
-        trigger.Anchored = true
-        trigger.CanCollide = false
-        trigger.Transparency = 1
-        trigger.Parent = parent
-
-        -- 트리거 바닥 (보라색 빛)
-        local triggerFloor = Instance.new("Part")
-        triggerFloor.Size = Vector3.new(TW, 0.5, 5)
-        triggerFloor.Position = Vector3.new(0, 0.25, triggerZ)
-        triggerFloor.Anchored = true
-        triggerFloor.CanCollide = false
-        triggerFloor.BrickColor = BrickColor.new("Bright violet")
-        triggerFloor.Material = Enum.Material.Neon
-        triggerFloor.Transparency = 0.5
-        triggerFloor.Parent = parent
-        table.insert(ActiveGimmicks, triggerFloor)
-
-        -- 퀴즈 문제 표시판
-        local questionBoard = Instance.new("Part")
-        questionBoard.Size = Vector3.new(20, 8, 1)
-        questionBoard.Position = Vector3.new(0, 12, portalZ - 5)
-        questionBoard.Anchored = true
-        questionBoard.CanCollide = false
-        questionBoard.BrickColor = BrickColor.new("Really black")
-        questionBoard.Material = Enum.Material.SmoothPlastic
-        questionBoard.Parent = parent
-        local boardGui = Instance.new("SurfaceGui")
-        boardGui.Face = Enum.NormalId.Front
-        boardGui.Parent = questionBoard
-        local questionLabel = Instance.new("TextLabel")
-        questionLabel.Size = UDim2.new(1, 0, 1, 0)
-        questionLabel.BackgroundTransparency = 1
-        questionLabel.Text = "❓ " .. quiz.q .. " ❓"
-        questionLabel.TextColor3 = Color3.new(1, 1, 1)
-        questionLabel.TextScaled = true
-        questionLabel.Font = Enum.Font.GothamBold
-        questionLabel.Parent = boardGui
-        table.insert(ActiveGimmicks, questionBoard)
-
-        -- 포탈 너비 계산
-        local portalWidth = (TW - 8) / optionCount
-        local portalRadius = math.min(portalWidth / 2 - 1, 5)
-
-        -- 각 포탈 생성
-        for i = 1, optionCount do
-            local xPos = -((TW - 8) / 2) + portalWidth / 2 + (i - 1) * portalWidth
-
-            -- 포탈 베이스 (원형 바닥)
-            local portalBase = Instance.new("Part")
-            portalBase.Name = "PortalBase_" .. portalId .. "_" .. i
-            portalBase.Size = Vector3.new(portalRadius * 2, 0.5, portalRadius * 2)
-            portalBase.Position = Vector3.new(xPos, 0.25, portalZ)
-            portalBase.Anchored = true
-            portalBase.Shape = Enum.PartType.Cylinder
-            portalBase.Orientation = Vector3.new(0, 0, 90)
-            portalBase.Color = portalColors[i]
-            portalBase.Material = Enum.Material.Neon
-            portalBase.Parent = parent
-
-            -- 포탈 링 (시각 효과)
-            local portalRing = Instance.new("Part")
-            portalRing.Name = "PortalRing_" .. portalId .. "_" .. i
-            portalRing.Size = Vector3.new(portalRadius * 2, 8, portalRadius * 2)
-            portalRing.Position = Vector3.new(xPos, 4, portalZ)
-            portalRing.Anchored = true
-            portalRing.CanCollide = false
-            portalRing.Shape = Enum.PartType.Cylinder
-            portalRing.Orientation = Vector3.new(0, 0, 90)
-            portalRing.Color = portalColors[i]
-            portalRing.Material = Enum.Material.ForceField
-            portalRing.Transparency = 0.3
-            portalRing.Parent = parent
-
-            -- 포탈 위 선택지 표시
-            local optionSign = Instance.new("Part")
-            optionSign.Size = Vector3.new(portalWidth - 2, 4, 0.5)
-            optionSign.Position = Vector3.new(xPos, 10, portalZ)
-            optionSign.Anchored = true
-            optionSign.CanCollide = false
-            optionSign.Color = portalColors[i]
-            optionSign.Material = Enum.Material.SmoothPlastic
-            optionSign.Parent = parent
-            local optGui = Instance.new("SurfaceGui")
-            optGui.Face = Enum.NormalId.Front
-            optGui.Parent = optionSign
-            local optLabel = Instance.new("TextLabel")
-            optLabel.Size = UDim2.new(1, 0, 0.4, 0)
-            optLabel.BackgroundTransparency = 1
-            optLabel.Text = "[" .. i .. "]"
-            optLabel.TextColor3 = Color3.new(1, 1, 1)
-            optLabel.TextScaled = true
-            optLabel.Font = Enum.Font.GothamBold
-            optLabel.Parent = optGui
-            local optText = Instance.new("TextLabel")
-            optText.Size = UDim2.new(0.95, 0, 0.55, 0)
-            optText.Position = UDim2.new(0.025, 0, 0.4, 0)
-            optText.BackgroundTransparency = 1
-            optText.Text = quiz.o[i]
-            optText.TextColor3 = Color3.new(1, 1, 1)
-            optText.TextScaled = true
-            optText.Font = Enum.Font.GothamBold
-            optText.Parent = optGui
-
-            -- 포탈 진입 감지
-            local portalTrigger = Instance.new("Part")
-            portalTrigger.Name = "PortalEnter_" .. portalId .. "_" .. i
-            portalTrigger.Size = Vector3.new(portalRadius * 2, 6, portalRadius * 2)
-            portalTrigger.Position = Vector3.new(xPos, 3, portalZ)
-            portalTrigger.Anchored = true
-            portalTrigger.CanCollide = false
-            portalTrigger.Transparency = 1
-            portalTrigger.Parent = parent
-
-            local db = {}
-            portalTrigger.Touched:Connect(function(hit)
-                local player = Players:GetPlayerFromCharacter(hit.Parent)
-                if not player or db[player] then return end
-
-                local answer = PlayerGateAnswers[player] and PlayerGateAnswers[player][1000 + portalId]
-                if not answer then return end  -- 트리거 안 밟았으면 무시
-
-                db[player] = true
-                local rp = hit.Parent:FindFirstChild("HumanoidRootPart")
-                local hum = hit.Parent:FindFirstChild("Humanoid")
-
-                if answer == i then
-                    -- 정답! 앞으로 텔레포트
-                    if rp then
-                        -- 텔레포트 이펙트
-                        portalRing.BrickColor = BrickColor.new("Lime green")
-                        TweenService:Create(portalRing, TweenInfo.new(0.2), {Transparency = 0}):Play()
-
-                        task.wait(0.3)
-                        rp.CFrame = CFrame.new(xPos, 3, exitZ + 5)
-
-                        -- 정답 보상: +10% 속도
-                        local newSpeed = ApplySpeedBoost(player, 10)
-                        Events.ItemEffect:FireClient(player, "SpeedUp", {
-                            speedPercent = newSpeed,
-                            message = "🌀 정답! +10%"
-                        })
-                        AddXP(player, 15, "Portal Correct")
-
-                        task.delay(0.5, function()
-                            portalRing.Color = portalColors[i]
-                            TweenService:Create(portalRing, TweenInfo.new(0.3), {Transparency = 0.3}):Play()
-                            db[player] = nil
-                        end)
-                    end
-                else
-                    -- 오답! 시작점으로 리턴
-                    if rp and hum then
-                        portalRing.BrickColor = BrickColor.new("Really red")
-                        TweenService:Create(portalRing, TweenInfo.new(0.2), {Transparency = 0}):Play()
-
-                        local origSpeed = hum.WalkSpeed
-                        local origJump = hum.JumpPower
-                        hum.WalkSpeed = 0
-                        hum.JumpPower = 0
-
-                        task.wait(0.3)
-                        rp.CFrame = CFrame.new(0, 3, startZ)
-
-                        Events.ItemEffect:FireClient(player, "GateWrong", {
-                            duration = 1.5,
-                            message = "🌀 오답! 시작점으로..."
-                        })
-
-                        task.delay(1.5, function()
-                            if hum then
-                                hum.WalkSpeed = origSpeed
-                                hum.JumpPower = origJump
-                            end
-                            portalRing.Color = portalColors[i]
-                            TweenService:Create(portalRing, TweenInfo.new(0.3), {Transparency = 0.3}):Play()
-                            db[player] = nil
-                        end)
-                    end
-                end
-            end)
-
-            -- 포탈 회전 애니메이션
-            table.insert(RotatingObjects, {
-                part = portalRing,
-                speed = 1.5,
-                rotation = 0,
-                rotationType = "Y"
-            })
-
-            table.insert(ActiveGimmicks, portalBase)
-            table.insert(ActiveGimmicks, portalRing)
-            table.insert(ActiveGimmicks, optionSign)
-            table.insert(ActiveGimmicks, portalTrigger)
-        end
-
-        -- 출구 표시
-        local exitMarker = Instance.new("Part")
-        exitMarker.Size = Vector3.new(TW, 0.3, 5)
-        exitMarker.Position = Vector3.new(0, 0.15, exitZ)
-        exitMarker.Anchored = true
-        exitMarker.CanCollide = false
-        exitMarker.BrickColor = BrickColor.new("Lime green")
-        exitMarker.Material = Enum.Material.Neon
-        exitMarker.Transparency = 0.5
-        exitMarker.Parent = parent
-        table.insert(ActiveGimmicks, exitMarker)
-
-        -- 트리거 이벤트 (퀴즈 표시)
-        local triggered = {}
-        trigger.Touched:Connect(function(hit)
-            local player = Players:GetPlayerFromCharacter(hit.Parent)
-            if not player or triggered[player] then return end
-            triggered[player] = true
-
-            if not PlayerGateAnswers[player] then PlayerGateAnswers[player] = {} end
-            PlayerGateAnswers[player][1000 + portalId] = quiz.a  -- 1000+ ID로 구분
-
-            Events.GateQuiz:FireClient(player, {
-                gateId = 1000 + portalId,
-                question = quiz.q,
-                options = quiz.o,
-                colors = {"#FF5050", "#5096FF", "#50FF50", "#FFDC50"}
-            })
-        end)
-
-        table.insert(ActiveGimmicks, trigger)
-        return trigger
-    end
-})
-
-print("✅ GimmickRegistry: 11 gimmicks registered")
+print("✅ GimmickRegistry: 10 gimmicks registered")
 
 -- ============================================
 -- 🏰 CREATE CASTLE EXTERIOR
@@ -2586,16 +1628,33 @@ local function CreateCastleExterior(parent)
     local moat = Instance.new("Part")
     moat.Name = "Moat"
     moat.Size = Vector3.new(200, 8, 250)
-    moat.Position = Vector3.new(0, -6, -50)  -- 더 아래로 이동
+    moat.Position = Vector3.new(0, -4, -50)
     moat.Anchored = true
     moat.CanCollide = false
     moat.BrickColor = BrickColor.new("Bright blue")
-    moat.Material = Enum.Material.Glass  -- 유리 재질 유지
-    moat.Transparency = 0.7  -- 0.3 → 0.7 (더 투명하게)
+    moat.Material = Enum.Material.Glass
+    moat.Transparency = 0.3
     moat.Parent = parent
     
-    -- EntranceBridge 및 난간 제거됨: 스폰이 로비 바닥에서 직접 시작
-
+    local bridge = Instance.new("Part")
+    bridge.Name = "EntranceBridge"
+    bridge.Size = Vector3.new(25, 2, 60)
+    bridge.Position = Vector3.new(0, 0, -50)
+    bridge.Anchored = true
+    bridge.BrickColor = BrickColor.new("Reddish brown")
+    bridge.Material = Enum.Material.Wood
+    bridge.Parent = parent
+    
+    for _, xOffset in ipairs({-11, 11}) do
+        local rail = Instance.new("Part")
+        rail.Size = Vector3.new(2, 4, 60)
+        rail.Position = Vector3.new(xOffset, 3, -50)
+        rail.Anchored = true
+        rail.BrickColor = BrickColor.new("Reddish brown")
+        rail.Material = Enum.Material.Wood
+        rail.Parent = parent
+    end
+    
     for _, xOffset in ipairs({-30, 30}) do
         local tower = Instance.new("Part")
         tower.Size = Vector3.new(20, 60, 20)
@@ -2673,57 +1732,48 @@ local function CreateCastleExterior(parent)
 end
 
 -- ============================================
--- 🎪 CREATE LOBBY + BRIDGE + START GATE
+-- 🎪 CREATE LOBBY
 -- ============================================
 local LobbySpawn = nil
 local StartGate = nil
 
 local function CreateLobby(parent)
-    print("  Building Lobby at Z=" .. LOBBY_Z .. "...")
-
+    print("  Building Lobby...")
+    
     local lobbyFolder = Instance.new("Folder")
     lobbyFolder.Name = "Lobby"
     lobbyFolder.Parent = parent
-
-    local TW = Config.TRACK_WIDTH
-
-    -- ========== 1. 로비 바닥 (Z=-30 중심) ==========
+    
     local lobbyFloor = Instance.new("Part")
-    lobbyFloor.Name = "LobbyFloor"
-    lobbyFloor.Size = Vector3.new(60, 1, 40)  -- 높이 1로 줄임
-    lobbyFloor.Position = Vector3.new(0, -0.5, LOBBY_Z)  -- Y=-0.5 (윗면 Y=0)
+    lobbyFloor.Size = Vector3.new(80, 2, 80)
+    lobbyFloor.Position = Vector3.new(0, -1, -80)
     lobbyFloor.Anchored = true
     lobbyFloor.BrickColor = BrickColor.new("Brick yellow")
     lobbyFloor.Material = Enum.Material.Cobblestone
     lobbyFloor.Parent = lobbyFolder
-
-    -- ========== 2. 스폰 위치 (다리 전) ==========
+    
     LobbySpawn = Instance.new("SpawnLocation")
     LobbySpawn.Name = "LobbySpawn"
-    LobbySpawn.Size = Vector3.new(40, 0.1, 30)  -- 매우 얇게
-    LobbySpawn.Position = Vector3.new(0, 0.1, LOBBY_Z)  -- 바닥 위로
+    LobbySpawn.Size = Vector3.new(30, 1, 30)
+    LobbySpawn.Position = Vector3.new(0, 1, -100)
     LobbySpawn.Anchored = true
-    LobbySpawn.Transparency = 1
-    LobbySpawn.CanCollide = false
-    LobbySpawn.Neutral = true
+    LobbySpawn.BrickColor = BrickColor.new("Lime green")
+    LobbySpawn.Material = Enum.Material.Neon
+    LobbySpawn.Neutral = true  -- 모든 플레이어가 여기서 스폰
     LobbySpawn.Enabled = true
-    LobbySpawn.Parent = Workspace
-    print("  ✅ LobbySpawn created at Z=" .. LOBBY_Z)
-
-    -- 다리 제거됨: 로비 바닥에서 바로 출발 게이트로 이동
-
-    -- ========== 4. 출발 게이트 ==========
+    LobbySpawn.Parent = lobbyFolder
+    
     StartGate = Instance.new("Part")
     StartGate.Name = "StartGate"
-    StartGate.Size = Vector3.new(TW + 4, 15, 3)
-    StartGate.Position = Vector3.new(0, 7.5, GATE_Z)
+    StartGate.Size = Vector3.new(40, 20, 3)
+    StartGate.Position = Vector3.new(0, 10, -20)
     StartGate.Anchored = true
     StartGate.CanCollide = true
     StartGate.BrickColor = BrickColor.new("Bright red")
     StartGate.Material = Enum.Material.Metal
     StartGate.Transparency = 0.3
     StartGate.Parent = lobbyFolder
-
+    
     local gateGui = Instance.new("SurfaceGui")
     gateGui.Face = Enum.NormalId.Back
     gateGui.Parent = StartGate
@@ -2736,8 +1786,7 @@ local function CreateLobby(parent)
     gateLabel.TextScaled = true
     gateLabel.Font = Enum.Font.GothamBold
     gateLabel.Parent = gateGui
-
-    print("  ✅ StartGate created at Z=" .. GATE_Z)
+    
     print("  ✅ Lobby Complete!")
     return lobbyFolder
 end
@@ -2745,29 +1794,30 @@ end
 -- ============================================
 -- 🏃 CREATE RACE TRACK
 -- ============================================
-local function CreateRaceTrack(parent)
-    print("  Building Race Track (starting at Z=" .. COURSE_START_Z .. ")...")
+local RaceSpawn = nil
 
+local function CreateRaceTrack(parent)
+    print("  Building Race Track...")
+    
     local trackFolder = Instance.new("Folder")
     trackFolder.Name = "RaceTrack"
     trackFolder.Parent = parent
-
+    
     local TL = Config.TRACK_LENGTH
     local TW = Config.TRACK_WIDTH
-    local OFFSET = COURSE_OFFSET  -- 코스 시작 오프셋 (30)
-
+    
     local floorSections = {
-        {OFFSET + 0, OFFSET + TL * 0.2, "Brick yellow", 0},
-        {OFFSET + TL * 0.2, OFFSET + TL * 0.4, "Medium stone grey", 0},
-        {OFFSET + TL * 0.4, OFFSET + TL * 0.6, "Sand blue", 0},
-        {OFFSET + TL * 0.6, OFFSET + TL * 0.8, "Nougat", 0},
-        {OFFSET + TL * 0.8, OFFSET + TL, "Bright yellow", 0},
+        {0, TL * 0.2, "Brick yellow", 0},
+        {TL * 0.2, TL * 0.4, "Medium stone grey", 0},
+        {TL * 0.4, TL * 0.6, "Sand blue", 0},
+        {TL * 0.6, TL * 0.8, "Nougat", 0},
+        {TL * 0.8, TL, "Bright yellow", 0},
     }
-
+    
     for _, sec in ipairs(floorSections) do
         local startZ, endZ, color, height = sec[1], sec[2], sec[3], sec[4]
         local length = endZ - startZ
-
+        
         local floor = Instance.new("Part")
         floor.Size = Vector3.new(TW, 2, length)
         floor.Position = Vector3.new(0, -1 + height, startZ + length/2)
@@ -2776,13 +1826,22 @@ local function CreateRaceTrack(parent)
         floor.Material = Enum.Material.Cobblestone
         floor.Parent = trackFolder
     end
-
-    -- RaceSpawn 제거됨: 플레이어가 직접 다리를 건너서 이동
-
+    
+    RaceSpawn = Instance.new("Part")
+    RaceSpawn.Name = "RaceSpawn"
+    RaceSpawn.Size = Vector3.new(TW, 1, 10)
+    RaceSpawn.Position = Vector3.new(0, 0.5, 5)
+    RaceSpawn.Anchored = true
+    RaceSpawn.CanCollide = false
+    RaceSpawn.BrickColor = BrickColor.new("Lime green")
+    RaceSpawn.Material = Enum.Material.Neon
+    RaceSpawn.Transparency = 0.5
+    RaceSpawn.Parent = trackFolder
+    
     local finishLine = Instance.new("Part")
     finishLine.Name = "FinishLine"
     finishLine.Size = Vector3.new(TW, 20, 5)
-    finishLine.Position = Vector3.new(0, 10, OFFSET + TL - 2)  -- 코스 끝 (Z=2098)
+    finishLine.Position = Vector3.new(0, 10, TL - 2)
     finishLine.Anchored = true
     finishLine.CanCollide = false
     finishLine.BrickColor = BrickColor.new("Bright yellow")
@@ -2801,85 +1860,6 @@ local function CreateRaceTrack(parent)
     finishLabel.TextScaled = true
     finishLabel.Font = Enum.Font.GothamBold
     finishLabel.Parent = finishGui
-
-    -- 🎉 피니시 구역 축하 벽 (떨어짐 방지)
-    local finishAreaLength = 50
-    local wallHeight = 25
-    local wallThickness = 3
-
-    -- 뒷벽 (Congratulations!)
-    local backWall = Instance.new("Part")
-    backWall.Name = "FinishBackWall"
-    backWall.Size = Vector3.new(TW + 10, wallHeight, wallThickness)
-    backWall.Position = Vector3.new(0, wallHeight / 2, OFFSET + TL + finishAreaLength)
-    backWall.Anchored = true
-    backWall.CanCollide = true
-    backWall.BrickColor = BrickColor.new("Gold")
-    backWall.Material = Enum.Material.Neon
-    backWall.Parent = trackFolder
-
-    local congratsGui = Instance.new("SurfaceGui")
-    congratsGui.Face = Enum.NormalId.Back
-    congratsGui.Parent = backWall
-    local congratsLabel = Instance.new("TextLabel")
-    congratsLabel.Size = UDim2.new(1, 0, 1, 0)
-    congratsLabel.BackgroundTransparency = 1
-    congratsLabel.Text = "🎉 CONGRATULATIONS! 🎉"
-    congratsLabel.TextColor3 = Color3.new(1, 1, 1)
-    congratsLabel.TextScaled = true
-    congratsLabel.Font = Enum.Font.GothamBold
-    congratsLabel.Parent = congratsGui
-
-    -- 앞쪽 표시 (반대편)
-    local congratsGuiFront = Instance.new("SurfaceGui")
-    congratsGuiFront.Face = Enum.NormalId.Front
-    congratsGuiFront.Parent = backWall
-    local congratsLabelFront = Instance.new("TextLabel")
-    congratsLabelFront.Size = UDim2.new(1, 0, 1, 0)
-    congratsLabelFront.BackgroundTransparency = 1
-    congratsLabelFront.Text = "🎉 CONGRATULATIONS! 🎉"
-    congratsLabelFront.TextColor3 = Color3.new(1, 1, 1)
-    congratsLabelFront.TextScaled = true
-    congratsLabelFront.Font = Enum.Font.GothamBold
-    congratsLabelFront.Parent = congratsGuiFront
-
-    -- 왼쪽 벽
-    local leftWall = Instance.new("Part")
-    leftWall.Name = "FinishLeftWall"
-    leftWall.Size = Vector3.new(wallThickness, wallHeight, finishAreaLength + 10)
-    leftWall.Position = Vector3.new(-TW / 2 - 5, wallHeight / 2, OFFSET + TL + finishAreaLength / 2)
-    leftWall.Anchored = true
-    leftWall.CanCollide = true
-    leftWall.BrickColor = BrickColor.new("Gold")
-    leftWall.Material = Enum.Material.Neon
-    leftWall.Transparency = 0.3
-    leftWall.Parent = trackFolder
-
-    -- 오른쪽 벽
-    local rightWall = Instance.new("Part")
-    rightWall.Name = "FinishRightWall"
-    rightWall.Size = Vector3.new(wallThickness, wallHeight, finishAreaLength + 10)
-    rightWall.Position = Vector3.new(TW / 2 + 5, wallHeight / 2, OFFSET + TL + finishAreaLength / 2)
-    rightWall.Anchored = true
-    rightWall.CanCollide = true
-    rightWall.BrickColor = BrickColor.new("Gold")
-    rightWall.Material = Enum.Material.Neon
-    rightWall.Transparency = 0.3
-    rightWall.Parent = trackFolder
-
-    -- 피니시 구역 바닥
-    local finishFloor = Instance.new("Part")
-    finishFloor.Name = "FinishFloor"
-    finishFloor.Size = Vector3.new(TW + 10, 2, finishAreaLength)
-    finishFloor.Position = Vector3.new(0, -1, OFFSET + TL + finishAreaLength / 2)
-    finishFloor.Anchored = true
-    finishFloor.CanCollide = true
-    finishFloor.BrickColor = BrickColor.new("Bright yellow")
-    finishFloor.Material = Enum.Material.Neon
-    finishFloor.Transparency = 0.5
-    finishFloor.Parent = trackFolder
-
-    print("  🎉 Finish celebration area created!")
     
     finishLine.Touched:Connect(function(hit)
         local player = Players:GetPlayerFromCharacter(hit.Parent)
@@ -2946,41 +1926,16 @@ end
 local CourseEngine = {}
 
 function CourseEngine:BuildFromData(parent, courseData)
-    -- 디버그: courseData 확인
-    if not courseData then
-        warn("❌ CourseEngine: courseData is nil!")
-        return 0, 1
-    end
-    if not courseData.metadata then
-        warn("❌ CourseEngine: courseData.metadata is nil!")
-        return 0, 1
-    end
-
-    local courseName = courseData.metadata.name or "Unknown"
-    local courseAuthor = courseData.metadata.author or "Unknown"
-    print("🏗️ Building course:", courseName, "by", courseAuthor)
+    print(string.format("🏗️ Building course: %s by %s",
+        courseData.metadata.name,
+        courseData.metadata.author))
 
     local builtCount = 0
     local errorCount = 0
 
-    if not courseData.gimmicks then
-        warn("❌ CourseEngine: courseData.gimmicks is nil!")
-        return 0, 1
-    end
-
     for i, gimmick in ipairs(courseData.gimmicks) do
-        -- Z 좌표에 COURSE_OFFSET 자동 적용
-        local offsetGimmick = {}
-        for k, v in pairs(gimmick) do
-            if k == "z" or k == "triggerZ" or k == "gateZ" or k == "elevZ" or k == "zStart" or k == "zEnd" then
-                offsetGimmick[k] = v + COURSE_OFFSET
-            else
-                offsetGimmick[k] = v
-            end
-        end
-
         local success, result = pcall(function()
-            return GimmickRegistry:Build(offsetGimmick.type, parent, offsetGimmick)
+            return GimmickRegistry:Build(gimmick.type, parent, gimmick)
         end)
 
         if success and result then
@@ -3112,93 +2067,40 @@ local itemList = {"Banana", "Booster", "Shield", "Lightning"}
 
 local function CreateItemBoxes(parent)
     local TL = Config.TRACK_LENGTH
-    local boxCount = 0
-
-    -- JumpPad 위치 수집 (제외할 Z 범위)
-    local excludeZones = {}
-    local course = CourseManager:GetCurrentCourse()
-    if course and course.gimmicks then
-        for _, gimmick in ipairs(course.gimmicks) do
-            if gimmick.type == "JumpPad" then
-                table.insert(excludeZones, gimmick.z)
-            end
-        end
-    end
-
-    -- 제외 영역 체크 함수
-    local function isExcluded(z)
-        for _, excludeZ in ipairs(excludeZones) do
-            if math.abs(z - excludeZ) < 30 then  -- JumpPad 기준 ±30 범위 제외
-                return true
-            end
-        end
-        return false
-    end
 
     for z = 100, TL - 150, 200 do
-        -- JumpPad 근처면 스킵
-        if isExcluded(z) then
-            print("📦 ItemBox skipped at z=" .. z .. " (near JumpPad)")
-        else
-            boxCount = boxCount + 1
-            local x = math.random(-12, 12)
-            local box = Instance.new("Part")
-            box.Name = "ItemBox"
-            box.Size = Vector3.new(5, 5, 5)
-            box.Position = Vector3.new(x, 4, COURSE_OFFSET + z)
-            box.Anchored = true
-            box.CanCollide = false
-            box.BrickColor = BrickColor.new("Bright yellow")
-            box.Material = Enum.Material.Neon
-            box.Transparency = 0.2
-            box.Parent = parent
+        local x = math.random(-12, 12)
+        local box = Instance.new("Part")
+        box.Name = "ItemBox"
+        box.Size = Vector3.new(5, 5, 5)
+        box.Position = Vector3.new(x, 4, z)
+        box.Anchored = true
+        box.CanCollide = false
+        box.BrickColor = BrickColor.new("Bright yellow")
+        box.Material = Enum.Material.Neon
+        box.Transparency = 0.2
+        box.Parent = parent
 
-            table.insert(ItemBoxes, {
-                part = box,
-                rotation = math.random(0, 360)
-            })
+        -- 🔄 PERFORMANCE: 개별 루프 대신 중앙 관리 테이블에 등록
+        table.insert(ItemBoxes, {
+            part = box,
+            rotation = math.random(0, 360)
+        })
 
-            local db, active = {}, true
-            box.Touched:Connect(function(hit)
-                if not active then return end
-
-                local char = hit.Parent
-                local player = Players:GetPlayerFromCharacter(char)
-
-                if not player and char and char.Parent then
-                    player = Players:GetPlayerFromCharacter(char.Parent)
-                    char = char.Parent
-                end
-
-                if not player then return end
-                if not PlayerData[player] then
-                    print("⚠️ ItemBox: No PlayerData for", player.Name)
-                    return
-                end
-                if db[player] then return end
-                if PlayerData[player].currentItem then
-                    return
-                end
-
-                db[player] = true
-                active = false
-                box.Transparency = 0.85
-
-                local itemType = itemList[math.random(#itemList)]
-                PlayerData[player].currentItem = itemType
-                print("📦 Item given to", player.Name, ":", itemType)
-                Events.ItemEffect:FireClient(player, "GotItem", {itemType = itemType})
-
-                task.delay(10, function()
-                    active = true
-                    box.Transparency = 0.2
-                    db[player] = nil
-                end)
-            end)
-        end
+        local db, active = {}, true
+        box.Touched:Connect(function(hit)
+            if not active then return end
+            local player = Players:GetPlayerFromCharacter(hit.Parent)
+            if not player or not PlayerData[player] or db[player] or PlayerData[player].currentItem then return end
+            db[player] = true
+            active = false
+            box.Transparency = 0.85
+            local itemType = itemList[math.random(#itemList)]
+            PlayerData[player].currentItem = itemType
+            Events.ItemEffect:FireClient(player, "GotItem", {itemType = itemType})
+            task.delay(10, function() active = true; box.Transparency = 0.2; db[player] = nil end)
+        end)
     end
-
-    print("📦 ItemBoxes created:", boxCount)
 end
 
 Events.UseItem.OnServerEvent:Connect(function(player, itemType)
@@ -3310,33 +2212,27 @@ local function InitializeMap()
     CreateItemBoxes(TrackFolder)
     
     print("🏰 Quiz Castle v3.2 Ready!")
-
-    -- 디버그: 게임 내 모든 SpawnLocation 확인
-    local spawnCount = 0
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("SpawnLocation") then
-            spawnCount = spawnCount + 1
-            print("📍 SpawnLocation found:", obj.Name, "at", obj.Position)
-        end
-    end
-    print("📍 Total SpawnLocations:", spawnCount)
 end
-
--- 🎯 로비 위치 상수 (새 레이아웃: Z=-30)
-local LOBBY_POSITION = Vector3.new(0, 3, LOBBY_Z)
 
 local function TeleportToLobby(player)
     local char = player.Character
-    if char then
+    if char and LobbySpawn then
         local rp = char:FindFirstChild("HumanoidRootPart")
         if rp then
-            local targetPos = LOBBY_POSITION + Vector3.new(math.random(-10, 10), 0, math.random(-5, 5))
-            rp.CFrame = CFrame.new(targetPos)
+            rp.CFrame = LobbySpawn.CFrame + Vector3.new(math.random(-8, 8), 3, math.random(-8, 8))
         end
     end
 end
 
--- TeleportToRace 삭제됨: 플레이어가 직접 다리를 건너서 이동
+local function TeleportToRace(player)
+    local char = player.Character
+    if char and RaceSpawn then
+        local rp = char:FindFirstChild("HumanoidRootPart")
+        if rp then
+            rp.CFrame = RaceSpawn.CFrame + Vector3.new(math.random(-15, 15), 3, 0)
+        end
+    end
+end
 
 local function UpdateLobbyUI()
     local lobbyPlayers = 0
@@ -3379,70 +2275,46 @@ local function CloseStartGate()
 end
 
 function StartCountdown()
-    print("⏰ StartCountdown! Players walk to gate themselves (15sec)")
     GameState.phase = "Countdown"
     GameState.countdown = Config.LOBBY_COUNTDOWN
-    GameState.sessionLocked = false  -- 세션 잠금 플래그
-
+    
     CloseStartGate()
-
-    -- 현재 있는 플레이어들을 레이스 참가자로 등록
+    
     GameState.playersInRace = {}
     for _, player in ipairs(Players:GetPlayers()) do
         if PlayerData[player] then
             table.insert(GameState.playersInRace, player)
+            TeleportToRace(player)
         end
     end
-    print("👥 Players in race:", #GameState.playersInRace)
-
-    -- 15초 카운트다운
+    
     for i = Config.LOBBY_COUNTDOWN, 1, -1 do
         GameState.countdown = i
-
-        -- 10초 남았을 때 (5초 경과) 세션 잠금
-        if i == 10 and not GameState.sessionLocked then
-            GameState.sessionLocked = true
-            print("🔒 Session LOCKED! No new entries.")
-            Events.RoundUpdate:FireAllClients("SessionLocked", {})
-        end
-
-        -- 게이트 UI 업데이트
+        
         if StartGate then
             local gui = StartGate:FindFirstChildOfClass("SurfaceGui")
             if gui then
                 local label = gui:FindFirstChild("GateLabel")
-                if label then
-                    if GameState.sessionLocked then
-                        label.Text = "🔒 " .. i
-                    else
-                        label.Text = "⏰ " .. i
-                    end
-                end
+                if label then label.Text = "⏰ " .. i end
             end
         end
-
-        Events.RoundUpdate:FireAllClients("Countdown", {
-            count = i,
-            locked = GameState.sessionLocked
-        })
+        
+        Events.RoundUpdate:FireAllClients("Countdown", {count = i})
         task.wait(1)
-
-        -- 플레이어 수 체크
+        
         local stillReady = 0
         for _, p in ipairs(GameState.playersInRace) do
             if p and p.Parent then stillReady = stillReady + 1 end
         end
-
+        
         if stillReady < Config.MIN_PLAYERS then
             GameState.phase = "Waiting"
-            GameState.sessionLocked = false
             CloseStartGate()
             Events.RoundUpdate:FireAllClients("CountdownCancelled", {})
-            print("❌ Countdown cancelled - not enough players")
             return
         end
     end
-
+    
     StartRace()
 end
 
@@ -3451,52 +2323,22 @@ function StartRace()
     GameState.roundNumber = GameState.roundNumber + 1
     GameState.finishedPlayers = {}
     GameState.raceStartTime = tick()
-
-    -- 모든 플레이어 속도 100%로 리셋
-    for _, player in ipairs(GameState.playersInRace) do
-        ResetSpeedBoost(player)
-    end
-
+    
     OpenStartGate()
-
+    
     Events.RoundUpdate:FireAllClients("RaceStart", {
         roundNumber = GameState.roundNumber,
-        totalPlayers = #GameState.playersInRace,
-        speedPercent = 100  -- 시작 속도
+        totalPlayers = #GameState.playersInRace
     })
     
     task.spawn(function()
         while GameState.phase == "Racing" do
             local elapsed = tick() - GameState.raceStartTime
-
-            -- 순위 계산 (Z 위치 기준)
-            local playerPositions = {}
             for _, player in ipairs(GameState.playersInRace) do
                 if player and player.Parent and not table.find(GameState.finishedPlayers, player) then
-                    local char = player.Character
-                    local z = 0
-                    if char then
-                        local rp = char:FindFirstChild("HumanoidRootPart")
-                        if rp then
-                            z = rp.Position.Z
-                        end
-                    end
-                    table.insert(playerPositions, {player = player, z = z})
+                    Events.TimeUpdate:FireClient(player, elapsed)
                 end
             end
-
-            -- Z 위치로 정렬 (내림차순 = 앞서가는 순)
-            table.sort(playerPositions, function(a, b) return a.z > b.z end)
-
-            -- 각 플레이어에게 시간, 순위, 진행도 전송
-            for rank, data in ipairs(playerPositions) do
-                local player = data.player
-                local z = data.z
-                -- 진행도: (현재Z - 코스시작) / 트랙길이 * 100
-                local progress = math.clamp((z - COURSE_START_Z) / Config.TRACK_LENGTH * 100, 0, 100)
-                Events.TimeUpdate:FireClient(player, elapsed, rank, math.floor(progress))
-            end
-
             task.wait(0.1)
         end
     end)
@@ -3598,33 +2440,16 @@ local function InitPlayer(player)
     end)
 end
 
--- ============================================
--- 🎮 PLAYER SETUP (함수로 분리)
--- ============================================
-local function SetupPlayer(player)
+Players.PlayerAdded:Connect(function(player)
     InitPlayer(player)
-
-    -- RespawnLocation 설정 (Roblox 기본 시스템 사용)
-    if LobbySpawn then
-        player.RespawnLocation = LobbySpawn
-        print("✅ Set RespawnLocation for", player.Name, "to LobbySpawn")
-    end
-
+    
     player.CharacterAdded:Connect(function(char)
-        print("🔄 CharacterAdded for", player.Name, "Phase:", GameState.phase)
-
-        -- 레이싱 중에 리스폰하면 레이스에서 제외
-        if GameState.phase == "Racing" then
-            local idx = table.find(GameState.playersInRace, player)
-            if idx then
-                table.remove(GameState.playersInRace, idx)
-                print("🏃 Removed", player.Name, "from race (respawned)")
-            end
+        task.wait(0.5)
+        
+        if GameState.phase == "Waiting" or GameState.phase == "Ended" then
+            TeleportToLobby(player)
         end
-
-        -- 속도 리셋 (새 캐릭터니까)
-        ResetSpeedBoost(player)
-
+        
         PlayerGateAnswers[player] = {}
         if PlayerData[player] then
             PlayerData[player].currentItem = nil
@@ -3695,8 +2520,8 @@ local function SetupPlayer(player)
                         if char and char.Parent and humanoidRootPart then
                             local safePos = PlayerData[player].lastSafePosition
                             if not safePos then
-                                -- Default to race start (with COURSE_OFFSET)
-                                safePos = Vector3.new(0, 3, COURSE_OFFSET + 10)
+                                -- Default to start line
+                                safePos = Vector3.new(Config.TRACK_WIDTH / 2, 10, 10)
                             end
                             
                             humanoidRootPart.CFrame = CFrame.new(safePos + Vector3.new(0, 5, 0))
@@ -3717,8 +2542,8 @@ local function SetupPlayer(player)
                                 end
                             end
                             
-                            -- Remove invincibility after 3 seconds
-                            task.delay(3, function()
+                            -- Remove invincibility after 2 seconds
+                            task.delay(2, function()
                                 if char and char.Parent then
                                     local shield = char:FindFirstChild("RespawnShield")
                                     if shield then shield:Destroy() end
@@ -3744,18 +2569,7 @@ local function SetupPlayer(player)
             end
         end)
     end)
-end
-
--- 새로 들어오는 플레이어
-Players.PlayerAdded:Connect(SetupPlayer)
-
--- 이미 존재하는 플레이어 처리 (서버보다 먼저 로드된 경우)
-for _, existingPlayer in ipairs(Players:GetPlayers()) do
-    task.spawn(function()
-        SetupPlayer(existingPlayer)
-    end)
-end
-print("✅ Existing players handled:", #Players:GetPlayers())
+end)
 
 Players.PlayerRemoving:Connect(function(player)
     if PlayerData[player] then
@@ -3807,29 +2621,7 @@ RunService.Heartbeat:Connect(function(dt)
     -- 회전 오브젝트 업데이트 (회전바 등)
     for i = #RotatingObjects, 1, -1 do
         local obj = RotatingObjects[i]
-
-        if obj.rotationType == "pivot" and obj.parts then
-            -- 피벗 회전 (틈새 있는 회전바)
-            local valid = true
-            for _, p in ipairs(obj.parts) do
-                if not p or not p.Parent then
-                    valid = false
-                    break
-                end
-            end
-
-            if valid then
-                obj.rotation = obj.rotation + obj.speed
-                local pivotCFrame = CFrame.new(0, obj.pivotY, obj.pivotZ)
-                for idx, bar in ipairs(obj.parts) do
-                    local offsetX = obj.offsets[idx]  -- 저장된 초기 오프셋 사용
-                    local localOffset = CFrame.new(offsetX, 0, 0)
-                    bar.CFrame = pivotCFrame * CFrame.Angles(0, math.rad(obj.rotation), 0) * localOffset
-                end
-            else
-                table.remove(RotatingObjects, i)
-            end
-        elseif obj.part and obj.part.Parent then
+        if obj.part and obj.part.Parent then
             obj.rotation = obj.rotation + obj.speed
             if obj.rotationType == "Y" then
                 obj.part.CFrame = CFrame.new(obj.part.Position) * CFrame.Angles(0, math.rad(obj.rotation), 0)
@@ -4238,18 +3030,10 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
             local oldLevel = PlayerData[targetPlayer].level
             PlayerData[targetPlayer].level = newLevel
 
-            local progress, xpInLevel, xpNeeded = GetLevelProgress(PlayerData[targetPlayer].xp, newLevel)
             Events.XPUpdate:FireClient(targetPlayer, {
                 xp = PlayerData[targetPlayer].xp,
-                xpGained = amount,
-                reason = "Admin",
                 level = newLevel,
-                levelName = LevelConfig[newLevel].name,
-                levelIcon = LevelConfig[newLevel].icon,
-                trailType = LevelConfig[newLevel].trailType,
-                progress = progress,
-                xpInLevel = xpInLevel,
-                xpNeeded = xpNeeded
+                gained = amount
             })
 
             if newLevel > oldLevel then
@@ -4291,18 +3075,10 @@ Events.AdminCommand.OnServerEvent:Connect(function(player, command, ...)
             PlayerData[targetPlayer].level = level
             PlayerData[targetPlayer].xp = LevelConfig[level].xp
 
-            local progress, xpInLevel, xpNeeded = GetLevelProgress(PlayerData[targetPlayer].xp, level)
             Events.XPUpdate:FireClient(targetPlayer, {
                 xp = PlayerData[targetPlayer].xp,
-                xpGained = 0,
-                reason = "Admin Set Level",
                 level = level,
-                levelName = LevelConfig[level].name,
-                levelIcon = LevelConfig[level].icon,
-                trailType = LevelConfig[level].trailType,
-                progress = progress,
-                xpInLevel = xpInLevel,
-                xpNeeded = xpNeeded
+                gained = 0
             })
 
             Events.LevelUp:FireClient(targetPlayer, {
