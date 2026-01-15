@@ -692,20 +692,30 @@ local function ShowLevelUpCelebration(data)
     end)
 end
 
+local currentBannerTween = nil
 local function ShowBanner(text, duration, color)
+    -- 기존 트윈 취소
+    if currentBannerTween then
+        currentBannerTween:Cancel()
+    end
+
     bannerText.Text = text
     bannerText.TextColor3 = color or Color3.new(1, 1, 1)
-    
+
     local showTween = TweenService:Create(titleBanner, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -250, 0, 20)
     })
     showTween:Play()
-    
+
     task.delay(duration or 3, function()
         local hideTween = TweenService:Create(titleBanner, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
             Position = UDim2.new(0.5, -250, 0, -100)
         })
+        currentBannerTween = hideTween
         hideTween:Play()
+        hideTween.Completed:Connect(function()
+            bannerText.Text = ""  -- 텍스트 지우기
+        end)
     end)
 end
 
