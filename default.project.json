@@ -6,7 +6,7 @@
         "ServerScriptService": {
             "$className": "ServerScriptService",
             "QuizCastleServer": {
-                "$path": "QuizCastleServer.lua"
+                "$path": "QuizCastleServer.server.lua"
             }
         },
 
@@ -15,7 +15,7 @@
             "StarterPlayerScripts": {
                 "$className": "StarterPlayerScripts",
                 "QuizCastleClient": {
-                    "$path": "QuizCastleClient.lua"
+                    "$path": "QuizCastleClient.client.lua"
                 }
             }
         },
