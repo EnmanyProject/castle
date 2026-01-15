@@ -1602,15 +1602,23 @@ CreateButton("🌐 GitHub에서 로드", Color3.fromRGB(100, 60, 180), function(
     end
 end)
 
--- Section: Quick Actions
-CreateSection("⚡ 빠른 작업")
+-- Section: Course Selection
+CreateSection("🎮 코스 선택")
 
-CreateButton("🏠 클래식 코스로 변경", Color3.fromRGB(60, 120, 60), function()
+CreateButton("🏠 Classic (기본)", Color3.fromRGB(60, 120, 60), function()
     Events.AdminCommand:FireServer("setcourse", "classic", "library")
 end)
 
-CreateButton("🔥 하드모드 코스로 변경", Color3.fromRGB(180, 60, 60), function()
+CreateButton("🔥 Hard Mode (고난이도)", Color3.fromRGB(180, 60, 60), function()
     Events.AdminCommand:FireServer("setcourse", "hardmode", "library")
+end)
+
+CreateButton("📗 Easy Tutorial (입문)", Color3.fromRGB(60, 160, 100), function()
+    Events.AdminCommand:FireServer("setcourse", "sample-easy", "github")
+end)
+
+CreateButton("⚡ Skill Test (기믹 테스트)", Color3.fromRGB(100, 100, 200), function()
+    Events.AdminCommand:FireServer("setcourse", "skill-test", "github")
 end)
 
 -- Section: Auto-Sync
