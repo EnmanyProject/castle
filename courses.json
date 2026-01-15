@@ -1,13 +1,13 @@
 {
     "version": "1.0",
-    "lastUpdated": "2026-01-11-TEST-001",
+    "lastUpdated": "2026-01-15T00:17:54.398Z",
     "courses": [
         {
             "id": "classic",
             "name": "Quiz Castle Classic",
             "author": "System",
             "difficulty": "medium",
-            "description": "기본 코스 - 균형 잡힌 난이도",
+            "description": "ê¸°ë³¸ ì½ì¤ - ê· í ì¡í ëì´ë",
             "source": "library"
         },
         {
@@ -15,7 +15,7 @@
             "name": "Quiz Castle Hard Mode",
             "author": "System",
             "difficulty": "hard",
-            "description": "고난이도 코스 - 빠른 장애물, 많은 퀴즈",
+            "description": "ê³ ëì´ë ì½ì¤ - ë¹ ë¥¸ ì¥ì ë¬¼, ë§ì í´ì¦",
             "source": "library"
         }
     ],
@@ -33,7 +33,7 @@
             "name": "Skill Gimmick Test Course",
             "author": "Dev Team",
             "difficulty": "medium",
-            "description": "스킬 기반 기믹 테스트 코스",
+            "description": "ì¤í¬ ê¸°ë° ê¸°ë¯¹ íì¤í¸ ì½ì¤",
             "url": "courses/skill-test.json"
         }
     ]
