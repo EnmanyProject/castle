@@ -219,11 +219,11 @@ raceInfo.TextStrokeColor3 = Color3.new(0, 0, 0)
 raceInfo.Visible = false
 raceInfo.Parent = screenGui
 
--- 🏆 TOP 10 (오른쪽) - 완전 투명, 텍스트만
+-- 🏆 실시간 순위 (상단 중앙, 타이머 아래) - 완전 투명, 텍스트만
 local leaderboardFrame = Instance.new("Frame")
 leaderboardFrame.Name = "LeaderboardFrame"
-leaderboardFrame.Size = UDim2.new(0, 200, 0, 300)
-leaderboardFrame.Position = UDim2.new(1, -215, 0, 15)  -- 오른쪽
+leaderboardFrame.Size = UDim2.new(0, 280, 0, 200)
+leaderboardFrame.Position = UDim2.new(0.5, -140, 0, 90)  -- 타이머 아래 중앙
 leaderboardFrame.BackgroundTransparency = 1
 leaderboardFrame.BorderSizePixel = 0
 leaderboardFrame.Visible = false
@@ -231,16 +231,16 @@ leaderboardFrame.Parent = screenGui
 
 local leaderboardTitle = Instance.new("TextLabel")
 leaderboardTitle.Name = "Title"
-leaderboardTitle.Size = UDim2.new(1, 0, 0, 30)
+leaderboardTitle.Size = UDim2.new(1, 0, 0, 25)
 leaderboardTitle.Position = UDim2.new(0, 0, 0, 0)
 leaderboardTitle.BackgroundTransparency = 1
-leaderboardTitle.Text = "🏆 TOP 10"
-leaderboardTitle.TextSize = 18
+leaderboardTitle.Text = "🏆 실시간 순위"
+leaderboardTitle.TextSize = 16
 leaderboardTitle.Font = Enum.Font.GothamBlack
 leaderboardTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 leaderboardTitle.TextStrokeTransparency = 0
 leaderboardTitle.TextStrokeColor3 = Color3.new(0, 0, 0)
-leaderboardTitle.TextXAlignment = Enum.TextXAlignment.Right
+leaderboardTitle.TextXAlignment = Enum.TextXAlignment.Center
 leaderboardTitle.Parent = leaderboardFrame
 
 local leaderboardList = Instance.new("Frame")
@@ -402,11 +402,11 @@ progressIcon.Text = "🏃"
 progressIcon.TextSize = 16
 progressIcon.Parent = progressContainer
 
--- Item Slot (Bottom Left) - 투명 배경
+-- Item Slot (순위 아래 중앙) - 투명 배경
 local itemSlot = Instance.new("Frame")
 itemSlot.Name = "ItemSlot"
 itemSlot.Size = UDim2.new(0, 70, 0, 70)
-itemSlot.Position = UDim2.new(0, 15, 1, -90)
+itemSlot.Position = UDim2.new(0.5, -35, 0, 295)  -- 순위 아래 중앙
 itemSlot.BackgroundTransparency = 1
 itemSlot.BorderSizePixel = 0
 itemSlot.Visible = false  -- 레이스 시작 전까지 숨김
