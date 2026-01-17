@@ -2224,16 +2224,6 @@ local function TeleportToLobby(player)
     end
 end
 
-local function TeleportToRace(player)
-    local char = player.Character
-    if char and RaceSpawn then
-        local rp = char:FindFirstChild("HumanoidRootPart")
-        if rp then
-            rp.CFrame = RaceSpawn.CFrame + Vector3.new(math.random(-15, 15), 3, 0)
-        end
-    end
-end
-
 local function UpdateLobbyUI()
     local lobbyPlayers = 0
     for _, player in ipairs(Players:GetPlayers()) do
@@ -2284,7 +2274,6 @@ function StartCountdown()
     for _, player in ipairs(Players:GetPlayers()) do
         if PlayerData[player] then
             table.insert(GameState.playersInRace, player)
-            TeleportToRace(player)
         end
     end
     
@@ -2442,12 +2431,18 @@ end
 
 Players.PlayerAdded:Connect(function(player)
     InitPlayer(player)
-    
-    player.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
 
+    -- 스폰 위치를 로비로 고정
+    if LobbySpawn then
+        player.RespawnLocation = LobbySpawn
+    end
+
+    player.CharacterAdded:Connect(function(char)
+        -- 즉시 로비로 텔레포트 (레이싱 중이 아닐 때)
         if GameState.phase == "Waiting" or GameState.phase == "Countdown" or GameState.phase == "Ended" then
-            TeleportToLobby(player)
+            task.defer(function()
+                TeleportToLobby(player)
+            end)
         end
         
         PlayerGateAnswers[player] = {}

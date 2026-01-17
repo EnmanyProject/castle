@@ -106,7 +106,11 @@
         .btn-success { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; }
         .btn-warning { background: linear-gradient(135deg, #f093fb, #f5576c); color: white; }
         .btn-danger { background: linear-gradient(135deg, #eb3349, #f45c43); color: white; }
+        .btn-info { background: linear-gradient(135deg, #00c6fb, #005bea); color: white; }
         .btn-small { padding: 6px 12px; font-size: 0.8rem; }
+        .btn-sm { padding: 4px 10px; font-size: 0.75rem; background: rgba(255,255,255,0.2); }
+        .btn-sm:hover { background: rgba(255,255,255,0.3); }
+        .btn.active { box-shadow: 0 0 10px rgba(255,255,255,0.5); transform: scale(1.05); }
 
         .btn:hover {
             transform: translateY(-2px);
@@ -1095,9 +1099,10 @@
             </div>
 
             <div class="view-toggle">
-                <button class="btn btn-primary" onclick="setView('2d')">2D 뷰</button>
+                <button class="btn btn-primary active" onclick="setView('2d')">📋 2D 뷰</button>
+                <button class="btn btn-success" onclick="setView('3d')">🎮 3D 뷰</button>
                 <button class="btn btn-warning" onclick="showPreviewModal()">👁️ 2D 프리뷰</button>
-                <button class="btn btn-success" onclick="show3DPreview()">🎮 3D 프리뷰</button>
+                <button class="btn btn-info" onclick="show3DPreview()">🏃 3D 시뮬레이션</button>
                 <button class="btn btn-danger" onclick="clearCourse()">🗑️ 초기화</button>
             </div>
 
@@ -1530,16 +1535,342 @@
         }
 
         // ==================== Course Editor ====================
+        // Inline 3D Scene variables
+        let inlineScene, inlineCamera, inlineRenderer, inlineControls;
+        let inlineAnimationId = null;
+        let inlineGimmickMeshes = [];
+
         function setView(view) {
             currentView = view;
             document.getElementById('track-view-2d').style.display = view === '2d' ? 'block' : 'none';
             document.getElementById('track-view-3d').style.display = view === '3d' ? 'block' : 'none';
-            if (view === '3d') init3DView();
+
+            // Update button states
+            document.querySelectorAll('.view-toggle .btn').forEach(btn => btn.classList.remove('active'));
+            if (view === '2d') {
+                document.querySelector('.view-toggle .btn-primary').classList.add('active');
+                // Stop inline 3D animation
+                if (inlineAnimationId) {
+                    cancelAnimationFrame(inlineAnimationId);
+                    inlineAnimationId = null;
+                }
+            } else {
+                init3DView();
+            }
         }
 
         function init3DView() {
             const container = document.getElementById('track-view-3d');
-            container.innerHTML = '<p style="padding: 20px; color: #888;">3D 프리뷰 버튼을 클릭하세요.</p>';
+            container.innerHTML = '';
+
+            const width = container.clientWidth || 800;
+            const height = 450;
+
+            // Create Scene
+            inlineScene = new THREE.Scene();
+            inlineScene.background = new THREE.Color(0x1a1a2e);
+            inlineScene.fog = new THREE.Fog(0x1a1a2e, 30, 150);
+
+            // Camera
+            inlineCamera = new THREE.PerspectiveCamera(60, width / height, 0.1, 500);
+
+            // Renderer
+            inlineRenderer = new THREE.WebGLRenderer({ antialias: true });
+            inlineRenderer.setSize(width, height);
+            inlineRenderer.shadowMap.enabled = true;
+            container.appendChild(inlineRenderer.domElement);
+
+            // Controls
+            inlineControls = new THREE.OrbitControls(inlineCamera, inlineRenderer.domElement);
+            inlineControls.enableDamping = true;
+            inlineControls.dampingFactor = 0.05;
+            inlineControls.maxPolarAngle = Math.PI / 2.1;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            inlineScene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(30, 50, 30);
+            directionalLight.castShadow = true;
+            inlineScene.add(directionalLight);
+
+            // Add control buttons
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'inline-3d-controls';
+            controlsDiv.innerHTML = `
+                <button onclick="setInlineCamera('quarter')" class="btn btn-sm">↗️ 쿼터</button>
+                <button onclick="setInlineCamera('top')" class="btn btn-sm">⬇️ 탑</button>
+                <button onclick="setInlineCamera('side')" class="btn btn-sm">➡️ 사이드</button>
+                <button onclick="setInlineCamera('first')" class="btn btn-sm">👁️ 1인칭</button>
+            `;
+            controlsDiv.style.cssText = 'position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 10;';
+            container.style.position = 'relative';
+            container.appendChild(controlsDiv);
+
+            renderInline3DCourse();
+            setInlineCamera('quarter');
+            animateInline3D();
+        }
+
+        function renderInline3DCourse() {
+            // Clear existing meshes
+            inlineGimmickMeshes.forEach(mesh => inlineScene.remove(mesh));
+            inlineGimmickMeshes = [];
+
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 1500;
+            const trackLength = courseLength * SCALE_3D;
+            const trackWidth = 30 * SCALE_3D;
+
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(trackWidth * 2, 20, 0x444466, 0x333355);
+            gridHelper.position.set(0, 0.01, trackLength / 2);
+            gridHelper.rotation.x = 0;
+            inlineScene.add(gridHelper);
+            inlineGimmickMeshes.push(gridHelper);
+
+            // Track
+            const trackGeometry = new THREE.BoxGeometry(trackWidth, 0.1, trackLength);
+            const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x2a2a4a });
+            const track = new THREE.Mesh(trackGeometry, trackMaterial);
+            track.position.set(0, 0, trackLength / 2);
+            track.receiveShadow = true;
+            inlineScene.add(track);
+            inlineGimmickMeshes.push(track);
+
+            // Track edges (neon lines)
+            const edgeGeometry = new THREE.BoxGeometry(0.05, 0.15, trackLength);
+            const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            const leftEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+            leftEdge.position.set(-trackWidth/2, 0.1, trackLength/2);
+            inlineScene.add(leftEdge);
+            inlineGimmickMeshes.push(leftEdge);
+
+            const rightEdge = new THREE.Mesh(edgeGeometry, edgeMaterial.clone());
+            rightEdge.position.set(trackWidth/2, 0.1, trackLength/2);
+            inlineScene.add(rightEdge);
+            inlineGimmickMeshes.push(rightEdge);
+
+            // Start line
+            const startGeometry = new THREE.BoxGeometry(trackWidth, 0.2, 0.1);
+            const startMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const startLine = new THREE.Mesh(startGeometry, startMaterial);
+            startLine.position.set(0, 0.15, 0);
+            inlineScene.add(startLine);
+            inlineGimmickMeshes.push(startLine);
+
+            // Finish line
+            const finishGeometry = new THREE.BoxGeometry(trackWidth, 2, 0.1);
+            const finishMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const finishLine = new THREE.Mesh(finishGeometry, finishMaterial);
+            finishLine.position.set(0, 1, trackLength);
+            inlineScene.add(finishLine);
+            inlineGimmickMeshes.push(finishLine);
+
+            // Render gimmicks with labels
+            courseGimmicks.forEach((gimmick, index) => {
+                const mesh = createInline3DGimmick(gimmick, index);
+                if (mesh) {
+                    inlineScene.add(mesh);
+                    inlineGimmickMeshes.push(mesh);
+                }
+            });
+
+            inlineControls.target.set(0, 0.5, trackLength / 2);
+            inlineControls.update();
+        }
+
+        function createInline3DGimmick(gimmick, index) {
+            const z = (gimmick.z || gimmick.triggerZ || gimmick.zStart || 0) * SCALE_3D;
+            const group = new THREE.Group();
+
+            // Get config
+            const gimmickConfigs = {
+                RotatingBar: { color: 0xff4444, icon: '🔄', name: '회전바' },
+                QuizGate: { color: 0x4488ff, icon: '❓', name: '퀴즈' },
+                Elevator: { color: 0x8844ff, icon: '🛗', name: '엘리베이터' },
+                ConveyorBelt: { color: 0x888888, icon: '➡️', name: '컨베이어' },
+                ElectricFloor: { color: 0xffdd00, icon: '⚡', name: '전기' },
+                PunchingCorridor: { color: 0xdd4444, icon: '👊', name: '펀칭' },
+                RollingBoulder: { color: 0x8B4513, icon: '🪨', name: '바위' },
+                DisappearingBridge: { color: 0x888888, icon: '🌉', name: '다리' },
+                PortalMaze: { color: 0xff44ff, icon: '🌀', name: '포탈' },
+                JumpPad: { color: 0x44ff44, icon: '⬆️', name: '점프' },
+                SlimeZone: { color: 0x88ff88, icon: '💚', name: '슬라임' },
+                LavaPlatform: { color: 0xff4400, icon: '🔥', name: '용암' }
+            };
+
+            const config = gimmickConfigs[gimmick.type] || { color: 0xffffff, icon: '?', name: gimmick.type };
+
+            // Create gimmick visualization based on type
+            let mainMesh;
+            switch(gimmick.type) {
+                case 'RotatingBar': {
+                    const width = (gimmick.width || 28) * SCALE_3D;
+                    const height = (gimmick.height || 3) * SCALE_3D;
+                    const barGeo = new THREE.BoxGeometry(width, 0.15, 0.15);
+                    const barMat = new THREE.MeshLambertMaterial({ color: config.color });
+                    mainMesh = new THREE.Mesh(barGeo, barMat);
+                    mainMesh.position.y = height;
+                    mainMesh.userData = { type: 'rotating', speed: gimmick.speed || 1.5 };
+                    break;
+                }
+                case 'QuizGate': {
+                    const options = gimmick.options || 2;
+                    const gateWidth = 1.4 / options;
+                    const gateZ = ((gimmick.gateZ || (gimmick.triggerZ + 30)) - (gimmick.triggerZ || 0)) * SCALE_3D;
+                    mainMesh = new THREE.Group();
+                    for (let i = 0; i < options; i++) {
+                        const frameGeo = new THREE.BoxGeometry(gateWidth - 0.05, 1, 0.1);
+                        const frameMat = new THREE.MeshLambertMaterial({
+                            color: i === 0 ? 0x00ff00 : config.color,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const frame = new THREE.Mesh(frameGeo, frameMat);
+                        frame.position.x = (i - (options-1)/2) * gateWidth;
+                        frame.position.y = 0.5;
+                        frame.position.z = gateZ;
+                        mainMesh.add(frame);
+                    }
+                    break;
+                }
+                case 'ConveyorBelt': {
+                    const length = (gimmick.length || 60) * SCALE_3D;
+                    const beltGeo = new THREE.BoxGeometry(1.2, 0.08, length);
+                    const beltMat = new THREE.MeshLambertMaterial({ color: config.color });
+                    mainMesh = new THREE.Mesh(beltGeo, beltMat);
+                    mainMesh.position.y = 0.1;
+                    mainMesh.position.z = length / 2;
+                    // Arrow indicators
+                    const arrowGeo = new THREE.ConeGeometry(0.1, 0.2, 4);
+                    const arrowMat = new THREE.MeshBasicMaterial({ color: gimmick.direction === -1 ? 0xff4444 : 0x44ff44 });
+                    for (let i = 0; i < 3; i++) {
+                        const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+                        arrow.rotation.x = gimmick.direction === -1 ? Math.PI / 2 : -Math.PI / 2;
+                        arrow.position.set(0, 0.2, length * (i + 1) / 4);
+                        group.add(arrow);
+                    }
+                    break;
+                }
+                case 'ElectricFloor': {
+                    const length = (gimmick.length || 60) * SCALE_3D;
+                    const floorGeo = new THREE.BoxGeometry(1.4, 0.05, length);
+                    const floorMat = new THREE.MeshLambertMaterial({
+                        color: config.color,
+                        emissive: config.color,
+                        emissiveIntensity: 0.3
+                    });
+                    mainMesh = new THREE.Mesh(floorGeo, floorMat);
+                    mainMesh.position.y = 0.1;
+                    mainMesh.position.z = length / 2;
+                    mainMesh.userData = { type: 'electric' };
+                    break;
+                }
+                case 'RollingBoulder': {
+                    const boulderGeo = new THREE.SphereGeometry(0.4, 16, 16);
+                    const boulderMat = new THREE.MeshLambertMaterial({ color: config.color });
+                    mainMesh = new THREE.Mesh(boulderGeo, boulderMat);
+                    mainMesh.position.y = 0.4;
+                    mainMesh.userData = {
+                        type: 'boulder',
+                        zStart: z,
+                        zEnd: (gimmick.zEnd || (gimmick.zStart + 100)) * SCALE_3D
+                    };
+                    break;
+                }
+                default: {
+                    // Generic marker for unknown types
+                    const markerGeo = new THREE.BoxGeometry(1, 0.5, 0.3);
+                    const markerMat = new THREE.MeshLambertMaterial({ color: config.color, transparent: true, opacity: 0.7 });
+                    mainMesh = new THREE.Mesh(markerGeo, markerMat);
+                    mainMesh.position.y = 0.25;
+                }
+            }
+
+            if (mainMesh) {
+                group.add(mainMesh);
+            }
+
+            // Add floating label with sprite
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.roundRect(0, 0, 128, 64, 8);
+            ctx.fill();
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#' + config.color.toString(16).padStart(6, '0');
+            ctx.fillText(config.icon, 64, 30);
+            ctx.font = '14px Arial';
+            ctx.fillStyle = 'white';
+            ctx.fillText(config.name, 64, 52);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(1, 0.5, 1);
+            sprite.position.y = 2;
+            group.add(sprite);
+
+            group.position.set(0, 0, z);
+            return group;
+        }
+
+        function setInlineCamera(view) {
+            const courseLength = parseInt(document.getElementById('courseLength').value) || 1500;
+            const trackLength = courseLength * SCALE_3D;
+            const centerZ = trackLength / 2;
+
+            switch(view) {
+                case 'quarter':
+                    inlineCamera.position.set(8, 6, centerZ - 5);
+                    break;
+                case 'top':
+                    inlineCamera.position.set(0, 15, centerZ);
+                    break;
+                case 'side':
+                    inlineCamera.position.set(10, 3, centerZ);
+                    break;
+                case 'first':
+                    inlineCamera.position.set(0, 0.5, 1);
+                    break;
+            }
+            inlineControls.target.set(0, 0.5, centerZ);
+            inlineControls.update();
+        }
+
+        function animateInline3D() {
+            inlineAnimationId = requestAnimationFrame(animateInline3D);
+
+            // Animate gimmicks
+            inlineGimmickMeshes.forEach(mesh => {
+                if (mesh.children) {
+                    mesh.children.forEach(child => {
+                        if (child.userData && child.userData.type === 'rotating') {
+                            child.rotation.y += child.userData.speed * 0.02;
+                        }
+                    });
+                }
+                if (mesh.userData && mesh.userData.type === 'rotating') {
+                    mesh.rotation.y += mesh.userData.speed * 0.02;
+                }
+                if (mesh.userData && mesh.userData.type === 'electric') {
+                    mesh.material.emissiveIntensity = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
+                }
+                if (mesh.userData && mesh.userData.type === 'boulder') {
+                    const range = mesh.userData.zEnd - mesh.userData.zStart;
+                    const newZ = mesh.userData.zStart + (Math.sin(Date.now() * 0.002) * 0.5 + 0.5) * range;
+                    if (mesh.parent) {
+                        mesh.parent.position.z = newZ;
+                    }
+                }
+            });
+
+            inlineControls.update();
+            inlineRenderer.render(inlineScene, inlineCamera);
         }
 
         // ==================== 2D Preview ====================

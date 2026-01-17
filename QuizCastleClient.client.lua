@@ -769,19 +769,90 @@ local function UpdateLeaderboard(data)
     end
 end
 
+-- 아이템 아이콘 정의
+local itemIcons = {
+    Booster = "🚀",
+    SpeedBoost = "🚀",
+    Shield = "🛡️",
+    Banana = "🍌",
+    Lightning = "⚡",
+    Teleport = "🌀",
+    PunchingGlove = "🥊",
+}
+
+local itemList = {"Booster", "Shield", "Banana", "Lightning"}
+local isRouletteRunning = false
+
+-- 마리오카트 스타일 룰렛 애니메이션
+local function PlayItemRoulette(finalItem, callback)
+    if isRouletteRunning then return end
+    isRouletteRunning = true
+
+    -- 룰렛 사운드 효과 (틱틱틱)
+    local totalSpins = 20  -- 총 회전 수
+    local startDelay = 0.05  -- 시작 속도 (빠름)
+    local endDelay = 0.25  -- 종료 속도 (느림)
+
+    task.spawn(function()
+        for i = 1, totalSpins do
+            -- 점점 느려지는 속도 계산
+            local progress = i / totalSpins
+            local delay = startDelay + (endDelay - startDelay) * (progress ^ 2)
+
+            -- 랜덤 아이템 표시 (마지막 3번은 최종 아이템으로 수렴)
+            local showItem
+            if i >= totalSpins - 2 then
+                showItem = finalItem
+            else
+                showItem = itemList[math.random(1, #itemList)]
+            end
+
+            itemIcon.Text = itemIcons[showItem] or "❓"
+
+            -- 크기 펄스 효과
+            local pulse = 1 + (0.3 * (1 - progress))
+            itemIcon.TextSize = 40 * pulse
+
+            -- 배경 깜빡임 효과
+            if i % 2 == 0 then
+                itemSlot.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
+                itemSlot.BackgroundTransparency = 0.5
+            else
+                itemSlot.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+                itemSlot.BackgroundTransparency = 0.6
+            end
+
+            task.wait(delay)
+        end
+
+        -- 최종 아이템 확정 애니메이션
+        itemIcon.Text = itemIcons[finalItem] or "❓"
+        itemIcon.TextSize = 50
+        itemSlot.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+        itemSlot.BackgroundTransparency = 0.3
+
+        -- 확정 효과 (커졌다 작아지기)
+        task.wait(0.1)
+        TweenService:Create(itemIcon, TweenInfo.new(0.2, Enum.EasingStyle.Back), {TextSize = 40}):Play()
+        TweenService:Create(itemSlot, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+
+        isRouletteRunning = false
+
+        if callback then callback() end
+    end)
+end
+
 local function UpdateItem(itemName)
     PlayerState.currentItem = itemName
-    
-    local itemIcons = {
-        SpeedBoost = "🚀",
-        Shield = "🛡️",
-        Banana = "🍌",
-        Lightning = "⚡",
-        Teleport = "🌀",
-        PunchingGlove = "🥊",
-    }
-    
-    itemIcon.Text = itemIcons[itemName] or ""
+
+    if itemName then
+        -- 룰렛 애니메이션 재생
+        PlayItemRoulette(itemName)
+    else
+        -- 아이템 사용됨 - 즉시 제거
+        itemIcon.Text = ""
+        itemIcon.TextSize = 40
+    end
 end
 
 local function UpdateProgress(progress)
@@ -1392,17 +1463,124 @@ legendLayout.Parent = legendFrame
 
 -- Gimmick colors and icons for preview
 local GimmickPreviewConfig = {
-    RotatingBar = {color = Color3.fromRGB(255, 100, 100), icon = "🔄"},
-    QuizGate = {color = Color3.fromRGB(100, 200, 255), icon = "❓"},
-    Elevator = {color = Color3.fromRGB(255, 200, 100), icon = "🛗"},
-    JumpPad = {color = Color3.fromRGB(100, 255, 150), icon = "⬆️"},
-    SlimeZone = {color = Color3.fromRGB(150, 255, 100), icon = "💚"},
-    DisappearingBridge = {color = Color3.fromRGB(200, 150, 255), icon = "🌉"},
-    ConveyorBelt = {color = Color3.fromRGB(150, 150, 150), icon = "➡️"},
-    ElectricFloor = {color = Color3.fromRGB(255, 255, 100), icon = "⚡"},
-    PunchingCorridor = {color = Color3.fromRGB(255, 150, 100), icon = "👊"},
-    RollingBoulder = {color = Color3.fromRGB(139, 90, 43), icon = "🪨"}
+    RotatingBar = {color = Color3.fromRGB(255, 100, 100), icon = "🔄", name = "회전바"},
+    QuizGate = {color = Color3.fromRGB(100, 200, 255), icon = "❓", name = "퀴즈"},
+    Elevator = {color = Color3.fromRGB(255, 200, 100), icon = "🛗", name = "엘리베이터"},
+    JumpPad = {color = Color3.fromRGB(100, 255, 150), icon = "⬆️", name = "점프패드"},
+    SlimeZone = {color = Color3.fromRGB(150, 255, 100), icon = "💚", name = "슬라임"},
+    DisappearingBridge = {color = Color3.fromRGB(200, 150, 255), icon = "🌉", name = "사라지는다리"},
+    ConveyorBelt = {color = Color3.fromRGB(150, 150, 150), icon = "➡️", name = "컨베이어"},
+    ElectricFloor = {color = Color3.fromRGB(255, 255, 100), icon = "⚡", name = "전기바닥"},
+    PunchingCorridor = {color = Color3.fromRGB(255, 150, 100), icon = "👊", name = "펀칭"},
+    RollingBoulder = {color = Color3.fromRGB(139, 90, 43), icon = "🪨", name = "바위"},
+    PortalMaze = {color = Color3.fromRGB(200, 100, 255), icon = "🌀", name = "포탈"},
+    LavaPlatform = {color = Color3.fromRGB(255, 80, 0), icon = "🔥", name = "용암"}
 }
+
+-- ============================================
+-- 🎯 3D GIMMICK GUIDE SYSTEM
+-- ============================================
+local gimmick3DMarkers = {}
+
+local function Clear3DGimmickGuide()
+    for _, marker in ipairs(gimmick3DMarkers) do
+        if marker and marker.Parent then
+            marker:Destroy()
+        end
+    end
+    gimmick3DMarkers = {}
+end
+
+local function Create3DGimmickMarker(position, gimmickType, config)
+    -- 3D 마커 파트 생성
+    local markerPart = Instance.new("Part")
+    markerPart.Name = "GimmickMarker_" .. gimmickType
+    markerPart.Size = Vector3.new(2, 2, 2)
+    markerPart.Position = position + Vector3.new(0, 15, 0)  -- 15 스터드 위에
+    markerPart.Anchored = true
+    markerPart.CanCollide = false
+    markerPart.Transparency = 1
+    markerPart.Parent = workspace
+
+    -- BillboardGui 생성
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "GimmickBillboard"
+    billboard.Size = UDim2.new(0, 80, 0, 60)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 200  -- 200 스터드 내에서만 보임
+    billboard.Parent = markerPart
+
+    -- 아이콘 배경
+    local iconBg = Instance.new("Frame")
+    iconBg.Size = UDim2.new(0, 50, 0, 50)
+    iconBg.Position = UDim2.new(0.5, -25, 0, 0)
+    iconBg.BackgroundColor3 = config.color
+    iconBg.BackgroundTransparency = 0.3
+    iconBg.BorderSizePixel = 0
+    iconBg.Parent = billboard
+
+    local iconCorner = Instance.new("UICorner")
+    iconCorner.CornerRadius = UDim.new(0.3, 0)
+    iconCorner.Parent = iconBg
+
+    -- 아이콘
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.Size = UDim2.new(1, 0, 1, 0)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Text = config.icon
+    iconLabel.TextSize = 30
+    iconLabel.Font = Enum.Font.GothamBold
+    iconLabel.TextColor3 = Color3.new(1, 1, 1)
+    iconLabel.Parent = iconBg
+
+    -- 이름 라벨
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0, 15)
+    nameLabel.Position = UDim2.new(0, 0, 1, -12)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = config.name or gimmickType
+    nameLabel.TextSize = 10
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextStrokeTransparency = 0.5
+    nameLabel.Parent = billboard
+
+    -- 부유 애니메이션
+    task.spawn(function()
+        local startY = markerPart.Position.Y
+        local time = 0
+        while markerPart and markerPart.Parent do
+            time = time + 0.05
+            local newY = startY + math.sin(time * 2) * 0.5
+            markerPart.Position = Vector3.new(markerPart.Position.X, newY, markerPart.Position.Z)
+            task.wait(0.05)
+        end
+    end)
+
+    table.insert(gimmick3DMarkers, markerPart)
+    return markerPart
+end
+
+local function Create3DGimmickGuide(courseData)
+    Clear3DGimmickGuide()
+
+    if not courseData or not courseData.gimmicks then
+        return
+    end
+
+    for _, gimmick in ipairs(courseData.gimmicks) do
+        local config = GimmickPreviewConfig[gimmick.type]
+        if config then
+            -- Z 위치 계산
+            local z = gimmick.z or gimmick.triggerZ or gimmick.zStart or 0
+            local position = Vector3.new(0, 0, z)
+            Create3DGimmickMarker(position, gimmick.type, config)
+        end
+    end
+
+    print("🎯 3D Gimmick Guide: " .. #gimmick3DMarkers .. " markers created")
+end
 
 -- Create legend items
 local function CreateLegendItem(gimmickType, config)
