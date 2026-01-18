@@ -933,9 +933,10 @@ GimmickRegistry:Register({
             arm.Parent = parent
             table.insert(ActiveGimmicks, arm)
 
-            -- 🥊 글러브
+            -- 🥊 글러브 (구형)
             local glove = Instance.new("Part")
             glove.Name = "PunchingGlove"
+            glove.Shape = Enum.PartType.Ball
             glove.Size = Vector3.new(5, 5, 5)
             glove.Position = Vector3.new(xPos, 4, zPos)
             glove.Anchored = true
