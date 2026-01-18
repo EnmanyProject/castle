@@ -446,37 +446,6 @@
             gap: 5px;
         }
 
-        .gimmick-modify-section {
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(255, 165, 0, 0.1);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            border-radius: 10px;
-        }
-
-        .gimmick-modify-section h4 {
-            color: #ffa500;
-            margin-bottom: 10px;
-            font-size: 0.9rem;
-        }
-
-        .gimmick-modify-section textarea {
-            width: 100%;
-            height: 60px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: white;
-            padding: 10px;
-            font-size: 0.85rem;
-            resize: none;
-            margin-bottom: 10px;
-        }
-
-        .gimmick-modify-section textarea::placeholder {
-            color: #888;
-        }
-
         .config-box {
             background: rgba(100, 100, 255, 0.1);
             border: 1px solid rgba(100, 100, 255, 0.3);
@@ -2507,11 +2476,6 @@
                             <h4>⚙️ 설정값</h4>
                             ${schemaHtml}
                         </div>
-                        <div class="gimmick-modify-section">
-                            <h4>📝 수정 요청</h4>
-                            <textarea id="modify-${type}" placeholder="이 기믹에 대한 수정 요청을 입력하세요...&#10;예: 속도를 더 빠르게, 높이를 낮게 등"></textarea>
-                            <button class="btn btn-warning btn-small" onclick="submitGimmickModifyRequest('${type}')">💬 요청 보내기</button>
-                        </div>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -2582,24 +2546,81 @@
                 rotation: 0, animationId: null
             };
 
-            // Animate
+            // Animate with realistic movements
             function animate() {
                 const data = gimmickGuide3DScenes[gimmickType];
                 if (!data) return;
 
                 data.animationId = requestAnimationFrame(animate);
+                const time = Date.now() * 0.001;
 
                 // Auto rotate slowly
                 data.rotation += 0.005;
                 if (data.gimmickMesh) {
                     data.gimmickMesh.rotation.y = data.rotation;
+                    const animData = data.gimmickMesh.userData.animData;
 
-                    // Type-specific animations
-                    if (gimmickType === 'RotatingBar' && data.gimmickMesh.children[0]) {
-                        data.gimmickMesh.children[0].rotation.z += 0.03;
-                    }
-                    if (gimmickType === 'ElectricFloor' && data.gimmickMesh.material) {
-                        data.gimmickMesh.material.emissiveIntensity = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
+                    // Type-specific realistic animations
+                    switch(gimmickType) {
+                        case 'RotatingBar':
+                            if (animData.rotatingBar) {
+                                animData.rotatingBar.rotation.y += 0.05; // 실제 회전 속도
+                            }
+                            break;
+
+                        case 'Elevator':
+                            if (animData.platforms) {
+                                const elev = animData.elevationHeight || 1.5;
+                                animData.platforms.forEach((plat, i) => {
+                                    // 정답 플랫폼(0)은 빨리, 오답(1,2)은 천천히
+                                    const speed = (i === 0) ? 2 : 0.5;
+                                    const base = 0.2;
+                                    plat.position.y = base + Math.abs(Math.sin(time * speed + i)) * elev;
+                                });
+                            }
+                            break;
+
+                        case 'ConveyorBelt':
+                            if (animData.arrows) {
+                                const len = animData.beltLength || 6;
+                                animData.arrows.forEach((arrow, i) => {
+                                    // 화살표가 뒤로 이동하는 애니메이션
+                                    arrow.position.z = ((i - 2) * (len / 5) + time * 2) % len - len / 2;
+                                });
+                            }
+                            break;
+
+                        case 'ElectricFloor':
+                            if (animData.bolts) {
+                                animData.bolts.forEach((bolt, i) => {
+                                    // 전기 깜빡임 효과
+                                    const flash = Math.sin(time * 10 + i * 2) > 0.3;
+                                    bolt.material.opacity = flash ? 1 : 0.3;
+                                    bolt.material.transparent = true;
+                                    bolt.scale.y = flash ? 1.2 : 0.8;
+                                });
+                            }
+                            break;
+
+                        case 'PunchingCorridor':
+                            if (animData.gloves) {
+                                animData.gloves.forEach((glove) => {
+                                    const { xRetracted, xExtended, phase } = glove.userData;
+                                    // 펀칭 애니메이션 (앞으로 쿵 치고 돌아옴)
+                                    const punch = Math.sin(time * 3 + phase);
+                                    const t = punch > 0.7 ? (punch - 0.7) / 0.3 : 0;
+                                    glove.position.x = xRetracted + (xExtended - xRetracted) * t;
+                                });
+                            }
+                            break;
+
+                        case 'RollingBoulder':
+                            if (animData.boulder) {
+                                // 바위 구르기 애니메이션
+                                animData.boulder.rotation.x += 0.05;
+                                animData.boulder.position.z = Math.sin(time) * 2;
+                            }
+                            break;
                     }
                 }
 
@@ -2608,14 +2629,18 @@
             animate();
         }
 
+        // 실제 게임 스케일 (1 stud = 0.1 units for better visibility)
+        const PREVIEW_SCALE = 0.1;
+
         function createGimmickGuide3DMesh(type) {
             const group = new THREE.Group();
+            group.userData = { type: type, animData: {} };
 
             const configs = {
                 RotatingBar: { color: 0xff4444 },
                 QuizGate: { color: 0x4488ff },
                 Elevator: { color: 0x8844ff },
-                ConveyorBelt: { color: 0x888888 },
+                ConveyorBelt: { color: 0x666666 },
                 ElectricFloor: { color: 0xffdd00 },
                 PunchingCorridor: { color: 0xdd4444 },
                 RollingBoulder: { color: 0x8B4513 },
@@ -2627,168 +2652,294 @@
             };
 
             const config = configs[type] || { color: 0xffffff };
+            const S = PREVIEW_SCALE; // 축약
 
             switch(type) {
                 case 'RotatingBar': {
+                    // 실제: Size(25, 2, 2), Height 3
+                    const barWidth = 25 * S;
+                    const barHeight = 2 * S;
+                    const barDepth = 2 * S;
+                    const height = 3 * S;
+
+                    // 중앙 기둥
                     const pillar = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.1, 0.1, 1.5, 8),
-                        new THREE.MeshLambertMaterial({ color: 0x666666 })
+                        new THREE.CylinderGeometry(0.08, 0.08, height + 0.1, 8),
+                        new THREE.MeshLambertMaterial({ color: 0x444444 })
                     );
-                    pillar.position.y = 0.25;
+                    pillar.position.y = height / 2;
                     group.add(pillar);
 
+                    // 회전 막대 (빨간색 메탈)
                     const bar = new THREE.Mesh(
-                        new THREE.BoxGeometry(2, 0.15, 0.15),
-                        new THREE.MeshLambertMaterial({ color: config.color })
+                        new THREE.BoxGeometry(barWidth, barHeight, barDepth),
+                        new THREE.MeshStandardMaterial({ color: config.color, metalness: 0.7, roughness: 0.3 })
                     );
-                    bar.position.y = 1;
+                    bar.position.y = height;
+                    bar.name = 'rotatingPart';
                     group.add(bar);
+                    group.userData.animData.rotatingBar = bar;
                     break;
                 }
                 case 'QuizGate': {
+                    // 실제: 2개 게이트, Size(gateWidth-1, 14, 3), Neon, 투명도 0.2
+                    const trackWidth = 30 * S;
+                    const gateHeight = 14 * S;
+                    const gateDepth = 3 * S;
+                    const gateColors = [0x00ff00, 0xff4444]; // 초록(정답), 빨강
+
                     for (let i = 0; i < 2; i++) {
+                        const gateWidth = (trackWidth / 2) - 1 * S;
                         const gate = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.8, 1.2, 0.1),
-                            new THREE.MeshLambertMaterial({
-                                color: i === 0 ? 0x00ff00 : config.color,
-                                transparent: true, opacity: 0.8
+                            new THREE.BoxGeometry(gateWidth, gateHeight, gateDepth),
+                            new THREE.MeshStandardMaterial({
+                                color: gateColors[i],
+                                transparent: true,
+                                opacity: 0.6,
+                                emissive: gateColors[i],
+                                emissiveIntensity: 0.3
                             })
                         );
-                        gate.position.set((i - 0.5) * 1, 0.1, 0);
+                        gate.position.set((i - 0.5) * (trackWidth / 2), gateHeight / 2, 0);
                         group.add(gate);
+
+                        // 번호 라벨
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 64; canvas.height = 64;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = 'white';
+                        ctx.font = 'bold 48px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText((i + 1).toString(), 32, 48);
+                        const texture = new THREE.CanvasTexture(canvas);
+                        const labelMat = new THREE.SpriteMaterial({ map: texture });
+                        const label = new THREE.Sprite(labelMat);
+                        label.scale.set(gateWidth * 0.5, gateWidth * 0.5, 1);
+                        label.position.set((i - 0.5) * (trackWidth / 2), gateHeight * 0.7, gateDepth / 2 + 0.01);
+                        group.add(label);
                     }
                     break;
                 }
                 case 'Elevator': {
+                    // 실제: 3개 플랫폼, 위로 올라감
+                    const trackWidth = 30 * S;
+                    const platHeight = 4 * S;
+                    const platLength = 22 * S;
+                    const elevationHeight = 15 * S;
+                    const platColors = [0x00ff00, 0x8844ff, 0x8844ff];
+
+                    const platforms = [];
                     for (let i = 0; i < 3; i++) {
+                        const platWidth = (trackWidth / 3) - 2 * S;
                         const plat = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.6, 0.15, 0.8),
-                            new THREE.MeshLambertMaterial({
-                                color: i === 0 ? 0x00ff00 : config.color
-                            })
+                            new THREE.BoxGeometry(platWidth, platHeight, platLength),
+                            new THREE.MeshStandardMaterial({ color: platColors[i], metalness: 0.5, roughness: 0.5 })
                         );
-                        plat.position.set((i - 1) * 0.7, i * 0.3 - 0.3, 0);
+                        plat.position.set((i - 1) * (trackWidth / 3), platHeight / 2, 0);
                         group.add(plat);
+                        platforms.push(plat);
                     }
+                    group.userData.animData.platforms = platforms;
+                    group.userData.animData.elevationHeight = elevationHeight;
                     break;
                 }
                 case 'ConveyorBelt': {
+                    // 실제: Size(TW-4, 1, length), DiamondPlate
+                    const trackWidth = 26 * S;
+                    const beltHeight = 1 * S;
+                    const beltLength = 60 * S;
+
                     const belt = new THREE.Mesh(
-                        new THREE.BoxGeometry(1.5, 0.1, 2),
-                        new THREE.MeshLambertMaterial({ color: config.color })
+                        new THREE.BoxGeometry(trackWidth, beltHeight, beltLength),
+                        new THREE.MeshStandardMaterial({ color: config.color, metalness: 0.8, roughness: 0.4 })
                     );
-                    belt.position.y = -0.4;
+                    belt.position.y = beltHeight / 2;
                     group.add(belt);
 
-                    // Arrows
-                    for (let i = 0; i < 3; i++) {
+                    // 방향 화살표들 (빨간색, 뒤로 밀림 표시)
+                    const arrows = [];
+                    for (let i = 0; i < 5; i++) {
                         const arrow = new THREE.Mesh(
-                            new THREE.ConeGeometry(0.1, 0.2, 4),
+                            new THREE.ConeGeometry(1 * S, 2 * S, 4),
                             new THREE.MeshBasicMaterial({ color: 0xff4444 })
                         );
-                        arrow.rotation.x = Math.PI / 2;
-                        arrow.position.set(0, -0.3, (i - 1) * 0.6);
+                        arrow.rotation.x = Math.PI / 2; // 뒤 방향
+                        arrow.position.set(0, beltHeight + 0.5 * S, (i - 2) * (beltLength / 5));
                         group.add(arrow);
+                        arrows.push(arrow);
                     }
+                    group.userData.animData.arrows = arrows;
+                    group.userData.animData.beltLength = beltLength;
                     break;
                 }
                 case 'ElectricFloor': {
+                    // 실제: Size(TW-4, 0.5, length+20), Metal
+                    const trackWidth = 26 * S;
+                    const floorHeight = 0.5 * S;
+                    const floorLength = 80 * S;
+
+                    // 바닥
                     const floor = new THREE.Mesh(
-                        new THREE.BoxGeometry(2, 0.1, 2),
-                        new THREE.MeshLambertMaterial({
-                            color: config.color,
-                            emissive: config.color,
-                            emissiveIntensity: 0.3
-                        })
+                        new THREE.BoxGeometry(trackWidth, floorHeight, floorLength),
+                        new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.2 })
                     );
-                    floor.position.y = -0.4;
+                    floor.position.y = floorHeight / 2;
                     group.add(floor);
+
+                    // 전기 볼트 표시
+                    const boltMaterial = new THREE.MeshBasicMaterial({ color: config.color });
+                    const bolts = [];
+                    for (let i = 0; i < 4; i++) {
+                        const bolt = new THREE.Mesh(
+                            new THREE.BoxGeometry(2 * S, 3 * S, 0.2 * S),
+                            boltMaterial.clone()
+                        );
+                        bolt.position.set((Math.random() - 0.5) * trackWidth * 0.8, 2 * S, (i - 1.5) * (floorLength / 4));
+                        bolt.rotation.z = Math.random() * 0.5 - 0.25;
+                        group.add(bolt);
+                        bolts.push(bolt);
+                    }
+                    group.userData.animData.bolts = bolts;
                     break;
                 }
                 case 'PunchingCorridor': {
-                    // Walls
+                    // 실제: 복도 폭 12, 벽 높이 10, 글러브 5x5x5
+                    const corridorWidth = 12 * S;
+                    const wallHeight = 10 * S;
+                    const length = 100 * S;
+                    const trackWidth = 30 * S;
+
+                    // 양쪽 벽
                     for (let i = 0; i < 2; i++) {
+                        const wallWidth = (trackWidth - corridorWidth) / 2;
                         const wall = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.1, 1, 2),
-                            new THREE.MeshLambertMaterial({ color: 0x666666 })
+                            new THREE.BoxGeometry(wallWidth, wallHeight, length),
+                            new THREE.MeshLambertMaterial({ color: 0x555555 })
                         );
-                        wall.position.set((i === 0 ? -1 : 1) * 0.8, 0, 0);
+                        wall.position.set((i === 0 ? -1 : 1) * (corridorWidth / 2 + wallWidth / 2), wallHeight / 2, 0);
                         group.add(wall);
                     }
-                    // Glove
-                    const glove = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.25, 8, 8),
-                        new THREE.MeshLambertMaterial({ color: config.color })
-                    );
-                    glove.position.set(0.5, 0.2, 0);
-                    group.add(glove);
+
+                    // 펀칭 글러브들
+                    const gloves = [];
+                    const numGloves = 4;
+                    for (let i = 0; i < numGloves; i++) {
+                        const side = (i % 2 === 0) ? 1 : -1;
+                        const glove = new THREE.Mesh(
+                            new THREE.BoxGeometry(5 * S, 5 * S, 5 * S),
+                            new THREE.MeshStandardMaterial({ color: config.color, metalness: 0.3, roughness: 0.7 })
+                        );
+                        const xRetracted = side * (corridorWidth / 2 + 3 * S);
+                        const xExtended = side * (corridorWidth / 2 - 2 * S);
+                        glove.position.set(xRetracted, 4 * S, (i - 1.5) * (length / 4));
+                        glove.userData = { xRetracted, xExtended, side, phase: i * 0.5 };
+                        group.add(glove);
+                        gloves.push(glove);
+                    }
+                    group.userData.animData.gloves = gloves;
                     break;
                 }
                 case 'RollingBoulder': {
+                    // 실제: 반지름 6 정도의 큰 바위
+                    const radius = 6 * S;
                     const boulder = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.5, 16, 16),
-                        new THREE.MeshLambertMaterial({ color: config.color })
+                        new THREE.SphereGeometry(radius, 16, 16),
+                        new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.9 })
                     );
-                    boulder.position.y = 0;
+                    boulder.position.y = radius;
                     group.add(boulder);
+                    group.userData.animData.boulder = boulder;
+                    group.userData.animData.radius = radius;
                     break;
                 }
                 case 'PortalMaze': {
+                    // 포탈 3개, 토러스 형태
+                    const portalRadius = 5 * S;
+                    const portalColors = [0x00ff00, 0xff44ff, 0xff44ff];
+
                     for (let i = 0; i < 3; i++) {
                         const portal = new THREE.Mesh(
-                            new THREE.TorusGeometry(0.3, 0.05, 8, 16),
-                            new THREE.MeshLambertMaterial({
-                                color: i === 0 ? 0x00ff00 : config.color
+                            new THREE.TorusGeometry(portalRadius, portalRadius * 0.15, 16, 32),
+                            new THREE.MeshStandardMaterial({
+                                color: portalColors[i],
+                                emissive: portalColors[i],
+                                emissiveIntensity: 0.5
                             })
                         );
-                        portal.position.set((i - 1) * 0.8, 0.2, 0);
+                        portal.position.set((i - 1) * portalRadius * 2.5, portalRadius * 1.2, 0);
+                        portal.rotation.y = Math.PI / 2;
                         group.add(portal);
                     }
                     break;
                 }
                 case 'JumpPad': {
+                    // 실제: Size(8, 1, 8), Lime green Neon
+                    const padSize = 8 * S;
                     const pad = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.5, 0.6, 0.15, 12),
-                        new THREE.MeshLambertMaterial({ color: config.color })
+                        new THREE.CylinderGeometry(padSize / 2, padSize / 2 * 1.1, 1 * S, 12),
+                        new THREE.MeshStandardMaterial({ color: config.color, emissive: config.color, emissiveIntensity: 0.5 })
                     );
-                    pad.position.y = -0.4;
+                    pad.position.y = 0.5 * S;
                     group.add(pad);
 
-                    // Arrow up
+                    // 위쪽 화살표
                     const arrow = new THREE.Mesh(
-                        new THREE.ConeGeometry(0.15, 0.4, 4),
+                        new THREE.ConeGeometry(2 * S, 4 * S, 4),
                         new THREE.MeshBasicMaterial({ color: 0xffffff })
                     );
-                    arrow.position.y = 0.1;
+                    arrow.position.y = 4 * S;
                     group.add(arrow);
+                    group.userData.animData.arrow = arrow;
                     break;
                 }
                 case 'SlimeZone': {
+                    // 실제: 반투명 슬라임 바닥
+                    const trackWidth = 30 * S;
+                    const length = 80 * S;
                     const slime = new THREE.Mesh(
-                        new THREE.BoxGeometry(2, 0.1, 2),
-                        new THREE.MeshLambertMaterial({
+                        new THREE.BoxGeometry(trackWidth, 0.5 * S, length),
+                        new THREE.MeshStandardMaterial({
                             color: config.color,
                             transparent: true,
-                            opacity: 0.7
+                            opacity: 0.6,
+                            emissive: config.color,
+                            emissiveIntensity: 0.2
                         })
                     );
-                    slime.position.y = -0.4;
+                    slime.position.y = 0.25 * S;
                     group.add(slime);
+
+                    // 유령 파티클
+                    for (let i = 0; i < 5; i++) {
+                        const ghost = new THREE.Mesh(
+                            new THREE.SphereGeometry(1 * S, 8, 8),
+                            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+                        );
+                        ghost.position.set((Math.random() - 0.5) * trackWidth * 0.8, 1 * S, (Math.random() - 0.5) * length * 0.8);
+                        group.add(ghost);
+                    }
                     break;
                 }
                 case 'DisappearingBridge': {
-                    for (let i = 0; i < 4; i++) {
+                    // 용암 위 사라지는 발판
+                    const lava = new THREE.Mesh(
+                        new THREE.BoxGeometry(30 * S, 1 * S, 50 * S),
+                        new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 0.5 })
+                    );
+                    lava.position.y = -5 * S;
+                    group.add(lava);
+
+                    const platforms = [];
+                    for (let i = 0; i < 6; i++) {
                         const plat = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.5, 0.1, 0.4),
-                            new THREE.MeshLambertMaterial({
-                                color: config.color,
-                                transparent: true,
-                                opacity: 0.8
-                            })
+                            new THREE.BoxGeometry(6 * S, 2 * S, 6 * S),
+                            new THREE.MeshLambertMaterial({ color: config.color })
                         );
-                        plat.position.set((i % 2 === 0 ? -0.3 : 0.3), -0.4, (i - 1.5) * 0.5);
+                        plat.position.set((i % 2 === 0 ? -1 : 1) * 5 * S, 1 * S, (i - 2.5) * 8 * S);
                         group.add(plat);
+                        platforms.push(plat);
                     }
+                    group.userData.animData.platforms = platforms;
                     break;
                 }
                 default: {
@@ -2817,34 +2968,6 @@
                 data.camera.position.set(3, 2, 3);
                 data.camera.lookAt(0, 0, 0);
             }
-        }
-
-        function submitGimmickModifyRequest(type) {
-            const textarea = document.getElementById(`modify-${type}`);
-            const request = textarea.value.trim();
-
-            if (!request) {
-                alert('수정 요청 내용을 입력해주세요.');
-                return;
-            }
-
-            const def = GIMMICK_DEFS[type];
-            const gimmickName = def ? def.displayName : type;
-
-            // 수정 요청 저장 (localStorage)
-            const requests = JSON.parse(localStorage.getItem('gimmick_modify_requests') || '[]');
-            requests.push({
-                type: type,
-                name: gimmickName,
-                request: request,
-                timestamp: new Date().toISOString()
-            });
-            localStorage.setItem('gimmick_modify_requests', JSON.stringify(requests));
-
-            alert(`✅ "${gimmickName}" 수정 요청이 저장되었습니다.\n\n요청 내용: ${request}`);
-            textarea.value = '';
-
-            console.log('📝 Gimmick Modify Request:', { type, gimmickName, request });
         }
 
         // ==================== Quiz Pool ====================
