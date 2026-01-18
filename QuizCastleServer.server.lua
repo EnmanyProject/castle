@@ -866,6 +866,8 @@ GimmickRegistry:Register({
         local length = data.length or 100
         local corridorWidth = 12
         local TW = Config.TRACK_WIDTH
+
+        -- 양쪽 벽
         for _, xOffset in ipairs({-corridorWidth/2 - 5, corridorWidth/2 + 5}) do
             local wall = Instance.new("Part")
             wall.Size = Vector3.new((TW - corridorWidth) / 2, 10, length)
@@ -876,11 +878,62 @@ GimmickRegistry:Register({
             wall.Parent = parent
             table.insert(ActiveGimmicks, wall)
         end
+
+        -- 경고 표지판
+        local warnSign = Instance.new("Part")
+        warnSign.Size = Vector3.new(10, 5, 1)
+        warnSign.Position = Vector3.new(0, 7, zStart - 3)
+        warnSign.Anchored = true
+        warnSign.CanCollide = false
+        warnSign.BrickColor = BrickColor.new("Bright red")
+        warnSign.Material = Enum.Material.Neon
+        warnSign.Parent = parent
+        local warnGui = Instance.new("SurfaceGui")
+        warnGui.Face = Enum.NormalId.Front
+        warnGui.Parent = warnSign
+        local warnLabel = Instance.new("TextLabel")
+        warnLabel.Size = UDim2.new(1, 0, 1, 0)
+        warnLabel.BackgroundTransparency = 1
+        warnLabel.Text = "🥊 PUNCH ZONE 🥊"
+        warnLabel.TextColor3 = Color3.new(1, 1, 1)
+        warnLabel.TextScaled = true
+        warnLabel.Font = Enum.Font.GothamBold
+        warnLabel.Parent = warnGui
+        table.insert(ActiveGimmicks, warnSign)
+
         local numGloves = math.floor(length / 25)
         for i = 1, numGloves do
             local zPos = zStart + i * (length / (numGloves + 1))
             local side = (i % 2 == 0) and 1 or -1
             local xPos = side * (corridorWidth/2 + 3)
+            local wallX = side * (TW/2 - 2)
+
+            -- 🔴 경고 라이트 (펀치 전 깜빡임)
+            local warningLight = Instance.new("Part")
+            warningLight.Name = "PunchWarning"
+            warningLight.Shape = Enum.PartType.Ball
+            warningLight.Size = Vector3.new(1.5, 1.5, 1.5)
+            warningLight.Position = Vector3.new(wallX, 7, zPos)
+            warningLight.Anchored = true
+            warningLight.CanCollide = false
+            warningLight.BrickColor = BrickColor.new("Lime green")
+            warningLight.Material = Enum.Material.Neon
+            warningLight.Parent = parent
+            table.insert(ActiveGimmicks, warningLight)
+
+            -- 🦾 팔 (피스톤)
+            local arm = Instance.new("Part")
+            arm.Name = "PunchingArm"
+            arm.Size = Vector3.new(2, 2, 6)
+            arm.Position = Vector3.new(xPos + side * 3, 4, zPos)
+            arm.Anchored = true
+            arm.CanCollide = false
+            arm.BrickColor = BrickColor.new("Medium stone grey")
+            arm.Material = Enum.Material.Metal
+            arm.Parent = parent
+            table.insert(ActiveGimmicks, arm)
+
+            -- 🥊 글러브
             local glove = Instance.new("Part")
             glove.Name = "PunchingGlove"
             glove.Size = Vector3.new(5, 5, 5)
@@ -889,6 +942,7 @@ GimmickRegistry:Register({
             glove.BrickColor = BrickColor.new("Bright red")
             glove.Material = Enum.Material.SmoothPlastic
             glove.Parent = parent
+
             local gloveGui = Instance.new("SurfaceGui")
             gloveGui.Face = (side == 1) and Enum.NormalId.Left or Enum.NormalId.Right
             gloveGui.Parent = glove
@@ -898,6 +952,7 @@ GimmickRegistry:Register({
             gloveLabel.Text = "🥊"
             gloveLabel.TextScaled = true
             gloveLabel.Parent = gloveGui
+
             local gloveFrontGui = Instance.new("SurfaceGui")
             gloveFrontGui.Face = Enum.NormalId.Front
             gloveFrontGui.Parent = glove
@@ -907,21 +962,48 @@ GimmickRegistry:Register({
             gloveFrontLabel.Text = "🥊"
             gloveFrontLabel.TextScaled = true
             gloveFrontLabel.Parent = gloveFrontGui
+
             local retracted = Vector3.new(xPos, 4, zPos)
             local extended = Vector3.new(-side * (corridorWidth/2 - 2), 4, zPos)
+            local armRetracted = Vector3.new(xPos + side * 3, 4, zPos)
+            local armExtended = Vector3.new(-side * (corridorWidth/2 - 5), 4, zPos)
+
+            -- 펀칭 애니메이션 루프
             task.spawn(function()
                 task.wait(i * 0.3)
                 while glove and glove.Parent do
-                    task.wait(2 / Config.ObstacleSpeed)
+                    -- 대기 상태 (초록 라이트)
+                    warningLight.BrickColor = BrickColor.new("Lime green")
+                    task.wait(1.5 / Config.ObstacleSpeed)
+
+                    -- ⚠️ 경고 단계 (노란색 깜빡임)
+                    for flash = 1, 3 do
+                        warningLight.BrickColor = BrickColor.new("Bright yellow")
+                        task.wait(0.1)
+                        warningLight.BrickColor = BrickColor.new("Black")
+                        task.wait(0.1)
+                    end
+
+                    -- 🔴 펀치 준비 (빨간색)
+                    warningLight.BrickColor = BrickColor.new("Really red")
                     glove.BrickColor = BrickColor.new("Really red")
-                    task.wait(0.3)
-                    TweenService:Create(glove, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Position = extended}):Play()
+                    glove.Material = Enum.Material.Neon
                     task.wait(0.2)
-                    TweenService:Create(glove, TweenInfo.new(0.4), {Position = retracted}):Play()
+
+                    -- 👊 펀치!
+                    TweenService:Create(glove, TweenInfo.new(0.08, Enum.EasingStyle.Back), {Position = extended}):Play()
+                    TweenService:Create(arm, TweenInfo.new(0.08, Enum.EasingStyle.Back), {Position = armExtended}):Play()
+                    task.wait(0.15)
+
+                    -- 복귀
+                    TweenService:Create(glove, TweenInfo.new(0.35), {Position = retracted}):Play()
+                    TweenService:Create(arm, TweenInfo.new(0.35), {Position = armRetracted}):Play()
                     glove.BrickColor = BrickColor.new("Bright red")
+                    glove.Material = Enum.Material.SmoothPlastic
                     task.wait(0.4)
                 end
             end)
+
             local db = {}
             glove.Touched:Connect(function(hit)
                 local player = Players:GetPlayerFromCharacter(hit.Parent)
@@ -1429,13 +1511,19 @@ GimmickRegistry:Register({
         floor.BrickColor = BrickColor.new("Medium stone grey")
         floor.Material = Enum.Material.Metal
         floor.Parent = parent
+
+        -- ⚡ 전기 볼트 파트들 (애니메이션용)
+        local boltParts = {}
         for i = 1, math.floor(length / 12) do
             local boltPart = Instance.new("Part")
+            boltPart.Name = "ElectricBolt"
             boltPart.Size = Vector3.new(5, 0.1, 5)
             boltPart.Position = Vector3.new(math.random(-12, 12), 0.35, zStart + i * 12)
             boltPart.Anchored = true
             boltPart.CanCollide = false
-            boltPart.Transparency = 1
+            boltPart.Transparency = 0.5
+            boltPart.BrickColor = BrickColor.new("Cyan")
+            boltPart.Material = Enum.Material.Neon
             boltPart.Parent = parent
             local boltGui = Instance.new("SurfaceGui")
             boltGui.Face = Enum.NormalId.Top
@@ -1445,9 +1533,32 @@ GimmickRegistry:Register({
             boltLabel.BackgroundTransparency = 1
             boltLabel.Text = "⚡"
             boltLabel.TextScaled = true
+            boltLabel.TextColor3 = Color3.new(0, 1, 1)
             boltLabel.Parent = boltGui
+            table.insert(boltParts, {part = boltPart, label = boltLabel})
             table.insert(ActiveGimmicks, boltPart)
         end
+
+        -- 🔴 경고 라이트 (양쪽)
+        local warningLights = {}
+        for i = 1, 3 do
+            for _, side in ipairs({-1, 1}) do
+                local light = Instance.new("Part")
+                light.Name = "WarningLight"
+                light.Shape = Enum.PartType.Ball
+                light.Size = Vector3.new(2, 2, 2)
+                light.Position = Vector3.new(side * (TW/2 - 2), 3, zStart + (i - 0.5) * (length / 3))
+                light.Anchored = true
+                light.CanCollide = false
+                light.BrickColor = BrickColor.new("Really red")
+                light.Material = Enum.Material.Neon
+                light.Transparency = 0.5
+                light.Parent = parent
+                table.insert(warningLights, light)
+                table.insert(ActiveGimmicks, light)
+            end
+        end
+
         local warnSign = Instance.new("Part")
         warnSign.Size = Vector3.new(12, 6, 1)
         warnSign.Position = Vector3.new(0, 5, zStart - 5)
@@ -1475,19 +1586,83 @@ GimmickRegistry:Register({
             local player = Players:GetPlayerFromCharacter(hit.Parent)
             if player then playersOnFloor[player] = nil end
         end)
+
+        -- 전기 애니메이션 루프
         task.spawn(function()
+            local isActive = false
             while floor and floor.Parent do
-                floor.BrickColor = BrickColor.new("Bright yellow")
+                -- 안전 상태 (회색, 볼트 깜빡임)
+                floor.BrickColor = BrickColor.new("Medium stone grey")
                 floor.Material = Enum.Material.Metal
-                task.wait(1.5)
+                for _, bolt in ipairs(boltParts) do
+                    bolt.part.Transparency = 0.8
+                    bolt.label.TextTransparency = 0.5
+                end
+                for _, light in ipairs(warningLights) do
+                    light.Transparency = 0.8
+                end
+
+                -- 1.5초 대기 중 볼트 깜빡임
+                for _ = 1, 6 do
+                    task.wait(0.25)
+                    for _, bolt in ipairs(boltParts) do
+                        bolt.part.Position = Vector3.new(
+                            math.random(-12, 12),
+                            0.35,
+                            bolt.part.Position.Z
+                        )
+                        bolt.part.Transparency = math.random() > 0.5 and 0.3 or 0.8
+                    end
+                end
+
+                -- ⚠️ 경고 단계 (노란색, 라이트 점멸)
+                floor.BrickColor = BrickColor.new("Bright yellow")
+                warnLabel.Text = "⚠️ WARNING ⚠️"
+                for flash = 1, 4 do
+                    for _, light in ipairs(warningLights) do
+                        light.Transparency = 0.2
+                        light.BrickColor = BrickColor.new("Bright yellow")
+                    end
+                    task.wait(0.15)
+                    for _, light in ipairs(warningLights) do
+                        light.Transparency = 0.7
+                    end
+                    task.wait(0.15)
+                end
+
+                -- ⚡ 전기 활성화 (시안색, 풀 네온)
                 floor.BrickColor = BrickColor.new("Cyan")
                 floor.Material = Enum.Material.Neon
+                warnLabel.Text = "⚡⚡⚡ SHOCK ⚡⚡⚡"
+                for _, bolt in ipairs(boltParts) do
+                    bolt.part.Transparency = 0
+                    bolt.part.BrickColor = BrickColor.new("Cyan")
+                    bolt.label.TextTransparency = 0
+                    bolt.label.TextColor3 = Color3.new(1, 1, 1)
+                end
+                for _, light in ipairs(warningLights) do
+                    light.Transparency = 0
+                    light.BrickColor = BrickColor.new("Cyan")
+                end
+
+                -- 플레이어에게 감전 효과
                 for player, _ in pairs(playersOnFloor) do
                     Events.ItemEffect:FireClient(player, "Electrocuted", {duration = 0.8})
                 end
-                task.wait(0.6)
-                floor.BrickColor = BrickColor.new("Medium stone grey")
-                floor.Material = Enum.Material.Metal
+
+                -- 전기 깜빡임 효과
+                for _ = 1, 6 do
+                    task.wait(0.1)
+                    for _, bolt in ipairs(boltParts) do
+                        bolt.part.Position = Vector3.new(
+                            math.random(-12, 12),
+                            0.35 + math.random() * 0.3,
+                            bolt.part.Position.Z
+                        )
+                    end
+                end
+
+                warnLabel.Text = "⚡ DANGER ⚡"
                 task.wait(2)
             end
         end)
