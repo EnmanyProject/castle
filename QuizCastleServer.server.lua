@@ -1297,6 +1297,39 @@ GimmickRegistry:Register({
         belt.BrickColor = BrickColor.new("Dark stone grey")
         belt.Material = Enum.Material.DiamondPlate
         belt.Parent = parent
+
+        -- 🔺 움직이는 화살표 생성
+        local arrowCount = math.max(3, math.floor(length / 15))  -- 15스터드마다 화살표
+        local arrows = {}
+        for i = 1, arrowCount do
+            local arrow = Instance.new("Part")
+            arrow.Name = "ConveyorArrow"
+            arrow.Shape = Enum.PartType.Cylinder
+            arrow.Size = Vector3.new(0.3, 4, 4)  -- 납작한 원형 화살표
+            arrow.CFrame = CFrame.new(0, 1.2, zStart + (i - 1) * (length / arrowCount)) * CFrame.Angles(0, 0, math.rad(90))
+            arrow.Anchored = true
+            arrow.CanCollide = false
+            arrow.BrickColor = BrickColor.new("Bright red")
+            arrow.Material = Enum.Material.Neon
+            arrow.Parent = parent
+
+            -- 화살표 방향 표시 (SurfaceGui)
+            local arrowGui = Instance.new("SurfaceGui")
+            arrowGui.Face = Enum.NormalId.Right
+            arrowGui.Parent = arrow
+            local arrowLabel = Instance.new("TextLabel")
+            arrowLabel.Size = UDim2.new(1, 0, 1, 0)
+            arrowLabel.BackgroundTransparency = 1
+            arrowLabel.Text = direction < 0 and "⬇️" or "⬆️"
+            arrowLabel.TextColor3 = Color3.new(1, 1, 1)
+            arrowLabel.TextScaled = true
+            arrowLabel.Font = Enum.Font.GothamBold
+            arrowLabel.Parent = arrowGui
+
+            table.insert(arrows, arrow)
+            table.insert(ActiveGimmicks, arrow)
+        end
+
         local signPart = Instance.new("Part")
         signPart.Size = Vector3.new(10, 5, 1)
         signPart.Position = Vector3.new(0, 5, zStart - 3)
@@ -1311,7 +1344,7 @@ GimmickRegistry:Register({
         local signLabel = Instance.new("TextLabel")
         signLabel.Size = UDim2.new(1, 0, 1, 0)
         signLabel.BackgroundTransparency = 1
-        signLabel.Text = "⬅️ CONVEYOR"
+        signLabel.Text = direction < 0 and "⬅️ CONVEYOR ⬅️" or "➡️ CONVEYOR ➡️"
         signLabel.TextColor3 = Color3.new(0, 0, 0)
         signLabel.TextScaled = true
         signLabel.Font = Enum.Font.GothamBold
@@ -1325,12 +1358,14 @@ GimmickRegistry:Register({
 
         -- 컨베이어 벨트 힘 (강화됨)
         local beltSpeed = 0.3 * (direction or -1)  -- 더 강한 힘
+        local arrowMoveSpeed = beltSpeed * 20  -- 화살표 이동 속도 (시각적으로 보이게 증폭)
+
         task.spawn(function()
             while belt and belt.Parent do
+                -- 플레이어 밀기
                 for char, _ in pairs(playersOnBelt) do
                     local rp = char:FindFirstChild("HumanoidRootPart")
                     if rp then
-                        -- AssemblyLinearVelocity로 더 자연스러운 밀기
                         local currentVel = rp.AssemblyLinearVelocity
                         rp.AssemblyLinearVelocity = Vector3.new(
                             currentVel.X,
@@ -1339,7 +1374,29 @@ GimmickRegistry:Register({
                         )
                     end
                 end
-                task.wait(0.05)  -- 약간의 딜레이로 성능 개선
+
+                -- 화살표 애니메이션 (벨트 속도와 동기화)
+                for _, arrow in ipairs(arrows) do
+                    if arrow and arrow.Parent then
+                        local pos = arrow.Position
+                        local newZ = pos.Z + arrowMoveSpeed * 0.05
+
+                        -- 범위 벗어나면 반대쪽으로 순환
+                        if direction < 0 then
+                            if newZ < zStart then
+                                newZ = zStart + length
+                            end
+                        else
+                            if newZ > zStart + length then
+                                newZ = zStart
+                            end
+                        end
+
+                        arrow.Position = Vector3.new(pos.X, pos.Y, newZ)
+                    end
+                end
+
+                task.wait(0.05)
             end
         end)
         table.insert(ActiveGimmicks, belt)
