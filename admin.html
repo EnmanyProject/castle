@@ -424,6 +424,59 @@
         .gimmick-tips h4 { color: #00ff64; margin-bottom: 5px; font-size: 0.9rem; }
         .gimmick-tips ul { color: #aaa; padding-left: 20px; font-size: 0.85rem; }
 
+        .gimmick-3d-preview {
+            width: 100%;
+            height: 200px;
+            background: #1a1a2e;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gimmick-3d-preview canvas {
+            border-radius: 10px;
+        }
+
+        .gimmick-3d-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .gimmick-modify-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .gimmick-modify-section h4 {
+            color: #ffa500;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .gimmick-modify-section textarea {
+            width: 100%;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            padding: 10px;
+            font-size: 0.85rem;
+            resize: none;
+            margin-bottom: 10px;
+        }
+
+        .gimmick-modify-section textarea::placeholder {
+            color: #888;
+        }
+
         .config-box {
             background: rgba(100, 100, 255, 0.1);
             border: 1px solid rgba(100, 100, 255, 0.3);
@@ -2390,6 +2443,9 @@
         });
 
         // ==================== Gimmick Guide ====================
+        // 기믹 가이드 3D 프리뷰 저장소
+        const gimmickGuide3DScenes = {};
+
         function renderGimmickGuide() {
             const grid = document.getElementById('gimmick-guide-grid');
             grid.innerHTML = '';
@@ -2414,8 +2470,15 @@
 
                 let schemaHtml = '';
                 for (const [key, config] of Object.entries(def.schema)) {
-                    schemaHtml += `<code>${key}</code> `;
+                    const label = config.label || key;
+                    const defaultVal = config.default !== undefined ? config.default : '-';
+                    schemaHtml += `<div style="display:flex;justify-content:space-between;margin:3px 0;">
+                        <span style="color:#aaa;">${label}</span>
+                        <code style="color:#4fc3f7;">${defaultVal}</code>
+                    </div>`;
                 }
+
+                const previewId = `gimmick-preview-${type}`;
 
                 card.innerHTML = `
                     <div class="gimmick-card-header">
@@ -2426,6 +2489,13 @@
                         </div>
                     </div>
                     <div class="gimmick-card-body">
+                        <div class="gimmick-3d-preview" id="${previewId}">
+                            <div class="gimmick-3d-controls">
+                                <button class="btn btn-sm" onclick="rotateGimmickPreview('${type}', -1)">◀</button>
+                                <button class="btn btn-sm" onclick="rotateGimmickPreview('${type}', 1)">▶</button>
+                                <button class="btn btn-sm" onclick="resetGimmickPreview('${type}')">↺</button>
+                            </div>
+                        </div>
                         <p class="gimmick-card-desc">${def.description}</p>
                         <div class="gimmick-tips">
                             <h4>💡 공략</h4>
@@ -2434,13 +2504,347 @@
                             </ul>
                         </div>
                         <div class="config-box">
-                            <h4>⚙️ 설정</h4>
-                            <p>${schemaHtml}</p>
+                            <h4>⚙️ 설정값</h4>
+                            ${schemaHtml}
+                        </div>
+                        <div class="gimmick-modify-section">
+                            <h4>📝 수정 요청</h4>
+                            <textarea id="modify-${type}" placeholder="이 기믹에 대한 수정 요청을 입력하세요...&#10;예: 속도를 더 빠르게, 높이를 낮게 등"></textarea>
+                            <button class="btn btn-warning btn-small" onclick="submitGimmickModifyRequest('${type}')">💬 요청 보내기</button>
                         </div>
                     </div>
                 `;
                 grid.appendChild(card);
             }
+
+            // 3D 프리뷰 초기화 (약간의 딜레이 후)
+            setTimeout(() => {
+                for (const type of Object.keys(GIMMICK_DEFS)) {
+                    initGimmickGuide3D(type);
+                }
+            }, 100);
+        }
+
+        function initGimmickGuide3D(gimmickType) {
+            const container = document.getElementById(`gimmick-preview-${gimmickType}`);
+            if (!container) return;
+
+            const width = container.clientWidth || 300;
+            const height = 200;
+
+            // Scene
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            // Camera
+            const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+            camera.position.set(3, 2, 3);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(width, height);
+
+            // 기존 캔버스 제거 후 새로 추가
+            const existingCanvas = container.querySelector('canvas');
+            if (existingCanvas) existingCanvas.remove();
+            container.insertBefore(renderer.domElement, container.firstChild);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+
+            // Ground
+            const groundGeo = new THREE.PlaneGeometry(6, 6);
+            const groundMat = new THREE.MeshLambertMaterial({ color: 0x2a2a4a });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.5;
+            scene.add(ground);
+
+            // Grid
+            const gridHelper = new THREE.GridHelper(6, 6, 0x444466, 0x333355);
+            gridHelper.position.y = -0.49;
+            scene.add(gridHelper);
+
+            // Gimmick Mesh
+            const gimmickMesh = createGimmickGuide3DMesh(gimmickType);
+            if (gimmickMesh) {
+                scene.add(gimmickMesh);
+            }
+
+            // Store scene data
+            gimmickGuide3DScenes[gimmickType] = {
+                scene, camera, renderer, gimmickMesh,
+                rotation: 0, animationId: null
+            };
+
+            // Animate
+            function animate() {
+                const data = gimmickGuide3DScenes[gimmickType];
+                if (!data) return;
+
+                data.animationId = requestAnimationFrame(animate);
+
+                // Auto rotate slowly
+                data.rotation += 0.005;
+                if (data.gimmickMesh) {
+                    data.gimmickMesh.rotation.y = data.rotation;
+
+                    // Type-specific animations
+                    if (gimmickType === 'RotatingBar' && data.gimmickMesh.children[0]) {
+                        data.gimmickMesh.children[0].rotation.z += 0.03;
+                    }
+                    if (gimmickType === 'ElectricFloor' && data.gimmickMesh.material) {
+                        data.gimmickMesh.material.emissiveIntensity = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
+                    }
+                }
+
+                data.renderer.render(data.scene, data.camera);
+            }
+            animate();
+        }
+
+        function createGimmickGuide3DMesh(type) {
+            const group = new THREE.Group();
+
+            const configs = {
+                RotatingBar: { color: 0xff4444 },
+                QuizGate: { color: 0x4488ff },
+                Elevator: { color: 0x8844ff },
+                ConveyorBelt: { color: 0x888888 },
+                ElectricFloor: { color: 0xffdd00 },
+                PunchingCorridor: { color: 0xdd4444 },
+                RollingBoulder: { color: 0x8B4513 },
+                DisappearingBridge: { color: 0x888888 },
+                PortalMaze: { color: 0xff44ff },
+                JumpPad: { color: 0x44ff44 },
+                SlimeZone: { color: 0x88ff88 },
+                LavaPlatform: { color: 0xff4400 }
+            };
+
+            const config = configs[type] || { color: 0xffffff };
+
+            switch(type) {
+                case 'RotatingBar': {
+                    const pillar = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.1, 0.1, 1.5, 8),
+                        new THREE.MeshLambertMaterial({ color: 0x666666 })
+                    );
+                    pillar.position.y = 0.25;
+                    group.add(pillar);
+
+                    const bar = new THREE.Mesh(
+                        new THREE.BoxGeometry(2, 0.15, 0.15),
+                        new THREE.MeshLambertMaterial({ color: config.color })
+                    );
+                    bar.position.y = 1;
+                    group.add(bar);
+                    break;
+                }
+                case 'QuizGate': {
+                    for (let i = 0; i < 2; i++) {
+                        const gate = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.8, 1.2, 0.1),
+                            new THREE.MeshLambertMaterial({
+                                color: i === 0 ? 0x00ff00 : config.color,
+                                transparent: true, opacity: 0.8
+                            })
+                        );
+                        gate.position.set((i - 0.5) * 1, 0.1, 0);
+                        group.add(gate);
+                    }
+                    break;
+                }
+                case 'Elevator': {
+                    for (let i = 0; i < 3; i++) {
+                        const plat = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.6, 0.15, 0.8),
+                            new THREE.MeshLambertMaterial({
+                                color: i === 0 ? 0x00ff00 : config.color
+                            })
+                        );
+                        plat.position.set((i - 1) * 0.7, i * 0.3 - 0.3, 0);
+                        group.add(plat);
+                    }
+                    break;
+                }
+                case 'ConveyorBelt': {
+                    const belt = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.5, 0.1, 2),
+                        new THREE.MeshLambertMaterial({ color: config.color })
+                    );
+                    belt.position.y = -0.4;
+                    group.add(belt);
+
+                    // Arrows
+                    for (let i = 0; i < 3; i++) {
+                        const arrow = new THREE.Mesh(
+                            new THREE.ConeGeometry(0.1, 0.2, 4),
+                            new THREE.MeshBasicMaterial({ color: 0xff4444 })
+                        );
+                        arrow.rotation.x = Math.PI / 2;
+                        arrow.position.set(0, -0.3, (i - 1) * 0.6);
+                        group.add(arrow);
+                    }
+                    break;
+                }
+                case 'ElectricFloor': {
+                    const floor = new THREE.Mesh(
+                        new THREE.BoxGeometry(2, 0.1, 2),
+                        new THREE.MeshLambertMaterial({
+                            color: config.color,
+                            emissive: config.color,
+                            emissiveIntensity: 0.3
+                        })
+                    );
+                    floor.position.y = -0.4;
+                    group.add(floor);
+                    break;
+                }
+                case 'PunchingCorridor': {
+                    // Walls
+                    for (let i = 0; i < 2; i++) {
+                        const wall = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.1, 1, 2),
+                            new THREE.MeshLambertMaterial({ color: 0x666666 })
+                        );
+                        wall.position.set((i === 0 ? -1 : 1) * 0.8, 0, 0);
+                        group.add(wall);
+                    }
+                    // Glove
+                    const glove = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.25, 8, 8),
+                        new THREE.MeshLambertMaterial({ color: config.color })
+                    );
+                    glove.position.set(0.5, 0.2, 0);
+                    group.add(glove);
+                    break;
+                }
+                case 'RollingBoulder': {
+                    const boulder = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.5, 16, 16),
+                        new THREE.MeshLambertMaterial({ color: config.color })
+                    );
+                    boulder.position.y = 0;
+                    group.add(boulder);
+                    break;
+                }
+                case 'PortalMaze': {
+                    for (let i = 0; i < 3; i++) {
+                        const portal = new THREE.Mesh(
+                            new THREE.TorusGeometry(0.3, 0.05, 8, 16),
+                            new THREE.MeshLambertMaterial({
+                                color: i === 0 ? 0x00ff00 : config.color
+                            })
+                        );
+                        portal.position.set((i - 1) * 0.8, 0.2, 0);
+                        group.add(portal);
+                    }
+                    break;
+                }
+                case 'JumpPad': {
+                    const pad = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.5, 0.6, 0.15, 12),
+                        new THREE.MeshLambertMaterial({ color: config.color })
+                    );
+                    pad.position.y = -0.4;
+                    group.add(pad);
+
+                    // Arrow up
+                    const arrow = new THREE.Mesh(
+                        new THREE.ConeGeometry(0.15, 0.4, 4),
+                        new THREE.MeshBasicMaterial({ color: 0xffffff })
+                    );
+                    arrow.position.y = 0.1;
+                    group.add(arrow);
+                    break;
+                }
+                case 'SlimeZone': {
+                    const slime = new THREE.Mesh(
+                        new THREE.BoxGeometry(2, 0.1, 2),
+                        new THREE.MeshLambertMaterial({
+                            color: config.color,
+                            transparent: true,
+                            opacity: 0.7
+                        })
+                    );
+                    slime.position.y = -0.4;
+                    group.add(slime);
+                    break;
+                }
+                case 'DisappearingBridge': {
+                    for (let i = 0; i < 4; i++) {
+                        const plat = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.5, 0.1, 0.4),
+                            new THREE.MeshLambertMaterial({
+                                color: config.color,
+                                transparent: true,
+                                opacity: 0.8
+                            })
+                        );
+                        plat.position.set((i % 2 === 0 ? -0.3 : 0.3), -0.4, (i - 1.5) * 0.5);
+                        group.add(plat);
+                    }
+                    break;
+                }
+                default: {
+                    const box = new THREE.Mesh(
+                        new THREE.BoxGeometry(1, 1, 1),
+                        new THREE.MeshLambertMaterial({ color: config.color })
+                    );
+                    group.add(box);
+                }
+            }
+
+            return group;
+        }
+
+        function rotateGimmickPreview(type, direction) {
+            const data = gimmickGuide3DScenes[type];
+            if (data) {
+                data.rotation += direction * 0.5;
+            }
+        }
+
+        function resetGimmickPreview(type) {
+            const data = gimmickGuide3DScenes[type];
+            if (data) {
+                data.rotation = 0;
+                data.camera.position.set(3, 2, 3);
+                data.camera.lookAt(0, 0, 0);
+            }
+        }
+
+        function submitGimmickModifyRequest(type) {
+            const textarea = document.getElementById(`modify-${type}`);
+            const request = textarea.value.trim();
+
+            if (!request) {
+                alert('수정 요청 내용을 입력해주세요.');
+                return;
+            }
+
+            const def = GIMMICK_DEFS[type];
+            const gimmickName = def ? def.displayName : type;
+
+            // 수정 요청 저장 (localStorage)
+            const requests = JSON.parse(localStorage.getItem('gimmick_modify_requests') || '[]');
+            requests.push({
+                type: type,
+                name: gimmickName,
+                request: request,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('gimmick_modify_requests', JSON.stringify(requests));
+
+            alert(`✅ "${gimmickName}" 수정 요청이 저장되었습니다.\n\n요청 내용: ${request}`);
+            textarea.value = '';
+
+            console.log('📝 Gimmick Modify Request:', { type, gimmickName, request });
         }
 
         // ==================== Quiz Pool ====================
